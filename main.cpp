@@ -768,6 +768,9 @@ void taskTelemetry()
     
     frsky_sport.telemetry_current = 23.4f + ((HAL_GetTick() % 3) * 0.3f);
     frsky_sport.telemetry_vbat = vbat;
+    frsky_sport.telemetry_acc_x = 123.45;
+    frsky_sport.telemetry_acc_y = 67.89;
+    frsky_sport.telemetry_acc_z = 0.12;
     
     
     
