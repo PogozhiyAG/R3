@@ -259,16 +259,10 @@ float    vbat = 0;
 
 
 HAL_StatusTypeDef hal_status;
-uint8_t d = 0;
 
 
 
 
-uint8_t gps_data[100]; 
-uint8_t gps_count = 0;
-
-uint32_t prev_t = 0;
-uint32_t max_t = 0;
 
 char report_data[1000];
 
@@ -291,15 +285,6 @@ HAL_StatusTypeDef I2CStatStatus(HAL_StatusTypeDef status, I2CStat* p_stat)
 }
 
 
-
-void taskGPSSend()
-{
-    if(gps_count > 0)
-    {
-        HAL_UART_Transmit(&gps_huart, gps_data, gps_count, 100000);
-        gps_count = 0;
-    }
-}
 
 
 
