@@ -5,6 +5,7 @@
 #include "stm32f4xx_hal.h"
 
 
+
 #define FRSKY_TELEMETRY_START_FRAME 0x7E
 #define FRSKY_SENSOR_DATA_FRAME 0x10
 #define FRSKY_STUFFING 0x7D
@@ -66,6 +67,9 @@ class FrskySport{
     float telemetry_acc_x;
     float telemetry_acc_y;
     float telemetry_acc_z;
+    float telemetry_alt;
+    int32_t telemetry_gps_lon;
+    int32_t telemetry_gps_lat;
     
 
 	//конструктор
@@ -173,12 +177,15 @@ class FrskySport{
 				case 0x22:
 					if(sensorDataPtr == 0) sportSetMessage(FRSKY_CURR_ID, (uint32_t)(telemetry_current * 10));
 					if(sensorDataPtr == 1) sportSetMessage(FRSKY_VFAS_ID, (uint32_t)(telemetry_vbat * 100));
-                    if(sensorDataPtr == 2) sportSetMessage(FRSKY_ACCX_ID, (uint32_t)(telemetry_acc_x * 100));
-                    if(sensorDataPtr == 3) sportSetMessage(FRSKY_ACCY_ID, (uint32_t)(telemetry_acc_y * 100));
-                    if(sensorDataPtr == 4) sportSetMessage(FRSKY_ACCZ_ID, (uint32_t)(telemetry_acc_z * 100));
+                    if(sensorDataPtr == 2) sportSetMessage(FRSKY_ACCX_ID, (int32_t)(telemetry_acc_x * 100));
+                    if(sensorDataPtr == 3) sportSetMessage(FRSKY_ACCY_ID, (int32_t)(telemetry_acc_y * 100));
+                    if(sensorDataPtr == 4) sportSetMessage(FRSKY_ACCZ_ID, (int32_t)(telemetry_acc_z * 100));
+                    if(sensorDataPtr == 5) sportSetMessage(FRSKY_ALT_ID,  (int32_t)(telemetry_alt * 100 + 810)); //TODO: Шо за 810?
+                    if(sensorDataPtr == 6) sportSetMessage(FRSKY_GPS_LON_LAT_ID, (int32_t)get_gps_lon_lat(true));
+                    if(sensorDataPtr == 7) sportSetMessage(FRSKY_GPS_LON_LAT_ID, (int32_t)get_gps_lon_lat(false));
                     
 					sensorDataPtr++;
-					if(sensorDataPtr >= 5) sensorDataPtr = 0;
+					if(sensorDataPtr >= 8) sensorDataPtr = 0;
 					result = true;
 					break;
 			}			
@@ -188,6 +195,33 @@ class FrskySport{
 		
 		return result;
 	}
+    
+    
+    uint32_t get_gps_lon_lat(bool lat)
+    {
+        uint32_t frsky_coord = 0;
+        int32_t coord = 0;
+
+        if (lat) {
+            // lattitude
+            coord = telemetry_gps_lat;
+            if (coord >= 0)
+                frsky_coord = 0;
+            else
+                frsky_coord = 1 << 30;
+        } else {
+            // longitude
+            coord = telemetry_gps_lon;
+            if (coord >= 0)
+                frsky_coord = 2 << 30;
+            else
+                frsky_coord = 3 << 30;
+        }
+        if(coord < 0) coord = coord * -1; 
+        frsky_coord |= (((uint64_t)coord * 6ull) / 100);
+
+        return frsky_coord;
+    }
 
 };
 

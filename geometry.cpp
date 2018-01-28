@@ -307,6 +307,21 @@ struct Quaternion
                 angle = 0;
             }
         };
+        
+        
+        inline void ToEuler(Vector3D& euler)const
+        {
+            float ysqr = Y * Y;
+            euler.X = atan2f(2.0f * (W * X + Y * Z), 1.0f - 2.0f * (X * X + ysqr));
+
+            float t2 = 2.0f * (W * Y - Z * X);
+            t2 = t2 > 1.0f ? 1.0f : t2;
+            t2 = t2 < -1.0f ? -1.0f : t2;
+            euler.Y = asinf(t2);
+
+            euler.Z = atan2f(2.0f * (W * Z + X * Y), 1.0f - 2.0f * (ysqr + Z * Z));
+
+        };
 
 };
 

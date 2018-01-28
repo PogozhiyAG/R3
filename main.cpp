@@ -149,6 +149,8 @@ float targetAngle;
 Vector3D targetErrors;
 Vector3D targetPIDs;
 
+Vector3D vEuler(0, 0, 0);
+
 //ось Z
 Vector3D zAxis(0, 0, 1.0f);
 
@@ -269,6 +271,7 @@ char report_data[1000];
 //DEBUG
 int32_t presure;
 float presure_mBar;
+float presure_home;
 
 
 
@@ -562,6 +565,7 @@ void taskAHRS()
                     
                     presure = (int32_t)(int8_t)barometer.data[3] << 16 | (uint16_t)barometer.data[2] << 8 | barometer.data[1];
                     presure_mBar = presure_mBar * 0.97f + ((float)presure / 4096) * 0.03f;
+                                        
                 }
                 
                 
@@ -749,6 +753,12 @@ void taskControl()
             pidX.kI = pidY.kI = pidZ.kI = i;
             pidX.maxI = pidY.maxI = pidZ.maxI = _maxI;            
             pidX.kD = pidY.kD = pidZ.kD = d;
+            
+            //установка домашнего давления
+            if (frsky_sbus.channels[11] == 0x0713 )
+            {
+                presure_home = presure_mBar;
+            }
         }
     }
 }
@@ -758,6 +768,7 @@ void taskControl()
 void taskTelemetry()
 {    
     static uint32_t reportTime = 0;
+    static uint32_t sportTime = 0;
     
     if (HAL_ADC_PollForConversion(&hadc, 10) == HAL_OK)
     {
@@ -765,15 +776,26 @@ void taskTelemetry()
         vbat = vbat * 0.9999f  + (adc_value * 3.3f * 11.86f / 4095) * 0.0001f;
     }
     
+    //S.PORT
+    if(get_time() - sportTime >= 20000)
+    {
+        sportTime = get_time();
+        
+        frsky_sport.telemetry_current = 23.4f + ((HAL_GetTick() % 3) * 0.3f);
+        frsky_sport.telemetry_vbat = vbat;
+        
+        ahrs_Mahony.Q.ToEuler(vEuler);        
+        frsky_sport.telemetry_acc_x = vEuler.X * RAD_TO_GRAD;
+        frsky_sport.telemetry_acc_y = vEuler.Y * RAD_TO_GRAD;
+        frsky_sport.telemetry_acc_z = vEuler.Z * RAD_TO_GRAD;
+        
+        frsky_sport.telemetry_alt = 18400 * (1 + 0.003665 * 20) * log10f(presure_home / presure_mBar);
+        
+        frsky_sport.telemetry_gps_lat = ubx_nav_pvt.lat;
+        frsky_sport.telemetry_gps_lon = ubx_nav_pvt.lon;
+    }
     
-    frsky_sport.telemetry_current = 23.4f + ((HAL_GetTick() % 3) * 0.3f);
-    frsky_sport.telemetry_vbat = vbat;
-    frsky_sport.telemetry_acc_x = 123.45;
-    frsky_sport.telemetry_acc_y = 67.89;
-    frsky_sport.telemetry_acc_z = 0.12;
-    
-    
-    
+    //modem
     if((get_time() - reportTime >= 65000)  && (modem_huart.gState == HAL_UART_STATE_READY) && (__HAL_UART_GET_FLAG(&modem_huart, UART_FLAG_TC)))
 	{        
         reportTime = get_time();
@@ -931,6 +953,13 @@ void init_sensors()
     //барометр
     barometer.writeRegister(0x10, 0x6A, 10);
     barometer.writeRegister(0x20, 0xF4, 10);
+    
+    //инициализация давления
+    ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
+    barometer.readAxis(10);
+    presure = (int32_t)(int8_t)barometer.data[3] << 16 | (uint16_t)barometer.data[2] << 8 | barometer.data[1];
+    presure_mBar = ((float)presure / 4096);
+    presure_home = presure_mBar;
 }
 
 
