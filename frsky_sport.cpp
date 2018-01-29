@@ -71,6 +71,7 @@ class FrskySport{
     int32_t telemetry_gps_lon;
     int32_t telemetry_gps_lat;
     
+    
 
 	//конструктор
 	FrskySport()
@@ -183,7 +184,7 @@ class FrskySport{
                     if(sensorDataPtr == 5) sportSetMessage(FRSKY_ALT_ID,  (int32_t)(telemetry_alt * 100 + 810)); //TODO: Шо за 810?
                     if(sensorDataPtr == 6) sportSetMessage(FRSKY_GPS_LON_LAT_ID, (int32_t)get_gps_lon_lat(true));
                     if(sensorDataPtr == 7) sportSetMessage(FRSKY_GPS_LON_LAT_ID, (int32_t)get_gps_lon_lat(false));
-                    
+                                        
 					sensorDataPtr++;
 					if(sensorDataPtr >= 8) sensorDataPtr = 0;
 					result = true;

@@ -21,11 +21,11 @@ class AHRSMahony
         q1 = 0.0f;
         q2 = 0.0f;
         q3 = 0.0f;
-        integralFBx = integralFBy = integralFBz = 0.0f;
+        ResetIntegral();
     }
     
     
-    void Update(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz, float deltat) {
+    void Update(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz, float deltat, bool useAcc = true) {
         float recipNorm;
         float q0q0, q0q1, q0q2, q0q3, q1q1, q1q2, q1q3, q2q2, q2q3, q3q3;  
         float hx, hy, bx, bz;
@@ -40,7 +40,8 @@ class AHRSMahony
         }
 
         // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
-        if(!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) {
+        if(useAcc && !((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) 
+        {
 
             // Normalise accelerometer measurement
             recipNorm = sqrt(ax * ax + ay * ay + az * az);
@@ -89,15 +90,7 @@ class AHRSMahony
             if(twoKi > 0.0f) {
                 integralFBx += twoKi * halfex * deltat;	// integral error scaled by Ki
                 integralFBy += twoKi * halfey * deltat;
-                integralFBz += twoKi * halfez * deltat;
-                gx += integralFBx;	// apply integral feedback
-                gy += integralFBy;
-                gz += integralFBz;
-            }
-            else {
-//                integralFBx = 0.0f;	// prevent integral windup
-//                integralFBy = 0.0f;
-//                integralFBz = 0.0f;
+                integralFBz += twoKi * halfez * deltat;                
             }
 
             // Apply proportional feedback
@@ -105,6 +98,12 @@ class AHRSMahony
             gy += twoKp * halfey;
             gz += twoKp * halfez;
         }
+        
+        // apply integral feedback
+        gx += integralFBx;	
+        gy += integralFBy;
+        gz += integralFBz;
+        
         
         // Integrate rate of change of quaternion
         gx *= (0.5f * deltat);		// pre-multiply common factors
@@ -126,6 +125,13 @@ class AHRSMahony
         q3 /= recipNorm;
         
         Q.Set(q1, q2, q3, q0); 
+    }
+    
+    
+    
+    void ResetIntegral()
+    {
+        integralFBx = integralFBy = integralFBz = 0.0f;
     }
     
 };

@@ -192,8 +192,8 @@ float Throttle = 0.0f;
 
 //сенсоры
 L3G4200D        gyroscope       (&hi2c_2, 1.00f);
-LIS331DLH       accelerometer   (&hi2c_2, 1.00f);
-LIS3MDL         magnetometer    (&hi2c, 1.00f);
+LIS331DLH       accelerometer   (&hi2c_2, 0.30f);
+LIS3MDL         magnetometer    (&hi2c, 0.30f);
 I2CSensor3Axis  barometer       (&hi2c_2, 0xB9, 0x27);
 
 //фильтр ориентации
@@ -218,6 +218,15 @@ Quaternion targetOrientation();
 
 //статус инициализации фильтра ориентации
 static uint8_t ahrs_state = 0;
+
+
+//DEBUG
+int32_t presure;
+float presure_mBar;
+float presure_home;
+//DEBUG
+float acceleration;
+float accelerationNormalRange = 0.2;
 
 
 
@@ -263,15 +272,10 @@ float    vbat = 0;
 HAL_StatusTypeDef hal_status;
 
 
-
-
-
 char report_data[1000];
 
-//DEBUG
-int32_t presure;
-float presure_mBar;
-float presure_home;
+
+
 
 
 
@@ -542,13 +546,18 @@ void taskAHRS()
             {   
                 timings[0].stop(get_time());
                 
+                //используем акселерометр только в более-менее спокойном состоянии
+                acceleration = accelerometer.result.GetLength();
+                bool useAcc = (acceleration > 1.0f - accelerationNormalRange) && (acceleration < 1.0f + accelerationNormalRange);
+                
                 //расчет текущей ориентации
                 ahrs_Mahony.Update
                 (
                     gyroscope.result.X, gyroscope.result.Y, gyroscope.result.Z,
                     accelerometer.result.X, accelerometer.result.Y, accelerometer.result.Z,                    
                     magnetometer.result.X, magnetometer.result.Y, magnetometer.result.Z,
-                    deltat * 0.000001f
+                    deltat * 0.000001f,
+                    useAcc
                 );
                 
                 
@@ -598,9 +607,9 @@ void taskStabilization(float deltat)
     {
         //читаем приемник
         Throttle = frsky_sbus.get_channel_throttle();
-        rc_axis_x = frsky_sbus.get_channel_axis_x();
-        rc_axis_y = frsky_sbus.get_channel_axis_y();
-        rc_axis_z = frsky_sbus.get_channel_axis_z();
+        rc_axis_x = frsky_sbus.get_channel_axis_x(0.02f);
+        rc_axis_y = frsky_sbus.get_channel_axis_y(0.008f);
+        rc_axis_z = frsky_sbus.get_channel_axis_z(0.008f);
     }
     else
     {
@@ -609,12 +618,9 @@ void taskStabilization(float deltat)
     
     
     //интегрируем угол курса
-    if(fabs(rc_axis_z) > 0.02f)
-    {
-        targetCourse += -rc_axis_z * 0.003f;
-        if(targetCourse >  PI2) targetCourse -= PI2;
-        if(targetCourse < -PI2) targetCourse += PI2;
-    }
+    targetCourse += -rc_axis_z * 0.003f;
+    if(targetCourse >  PI2) targetCourse -= PI2;
+    if(targetCourse < -PI2) targetCourse += PI2;
     
     
     //ось крена-тангажа
@@ -793,6 +799,7 @@ void taskTelemetry()
         
         frsky_sport.telemetry_gps_lat = ubx_nav_pvt.lat;
         frsky_sport.telemetry_gps_lon = ubx_nav_pvt.lon;
+        
     }
     
     //modem
@@ -931,11 +938,11 @@ void init_sensors()
 	
 	//акселерометр
 	accelerometer.writeRegister(LIS331DLH_CTRL_REG_1, 0x3F, 10);
-	accelerometer.writeRegister(LIS331DLH_CTRL_REG_4, 0x90, 10);
-	accelerometer.offset.Set(56.89f, -477.30f, 497.13f);	
-	accelerometer.scaleFactor[0].Set(0.000121f, 0.000003f, 0.000000f);
-	accelerometer.scaleFactor[1].Set(0.000002f, 0.000121f, 0.000000f);
-	accelerometer.scaleFactor[2].Set(-0.000000f, 0.000000f, 0.000121f);
+	accelerometer.writeRegister(LIS331DLH_CTRL_REG_4, 0x80, 10); //+-2G
+	accelerometer.offset.Set(485.79f, -529.53f, 290.00f);	
+	accelerometer.scaleFactor[0].Set(0.000060f, 0.000001f, 0.000000f);
+	accelerometer.scaleFactor[1].Set(0.000001f, 0.000060f, 0.000000f);
+	accelerometer.scaleFactor[2].Set(0.000000f, 0.000000f, 0.000060f);
 	
 		
 	//магнетометр    
