@@ -168,8 +168,9 @@ PID pidZ(maxValue * 0.3f, kP, maxP * 0.3f, kI, maxI, kD, maxD);
 
 
 //ћин и макс сигналы моторов
-uint32_t minMotors = 900,
-         maxMotors = 1700;
+//»нициализаци€ в  init() когда будет известна SystemCoreClock
+uint32_t minMotors = 0,
+         maxMotors = 0;
 
 //таблица микшировани€ моторов
 float mixMotor[4][4] = 
@@ -1513,12 +1514,18 @@ void init()
 	/************** Motors ****************/
 	/**************************************/
 
+    //перевод микросекунд в тики
+    uint32_t us_scale = (uint32_t) (SystemCoreClock / 1000000);
+    //TODO: поигратьс€ (may be 700::1900 or 800:1800 e.t.c.)
+    minMotors =  900 * us_scale;
+    maxMotors = 1700 * us_scale;
+    
     /************** Motors::Timer *****************/
-	htim_motor.Instance = TIM3;
-	htim_motor.Init.Period = 4000; 
-    htim_motor.Init.Prescaler = (uint32_t) ((SystemCoreClock / 1000000) - 1); 
+    htim_motor.Instance = TIM3;
+    htim_motor.Init.Period = 2000 * us_scale;          //500Hz
+    htim_motor.Init.Prescaler = 0;                     //Max resolution
     htim_motor.Init.ClockDivision = 0; 
-    htim_motor.Init.CounterMode = TIM_COUNTERMODE_UP; 
+    htim_motor.Init.CounterMode = TIM_COUNTERMODE_UP;
 	
 	HAL_TIM_PWM_Init(&htim_motor);
 	
