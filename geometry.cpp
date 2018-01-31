@@ -5,9 +5,9 @@
 #include <math.h>
 
 #define EPSILON     1.401298E-45f
-#define PI			3.141592654f
-#define PI2			6.283185308f
-#define PI05		1.570796327f
+#define PI	    3.141592654f
+#define PI2         6.283185308f
+#define PI05	    1.570796327f
 #define RAD_TO_GRAD 57.29577951f
 
 struct Vector3D
@@ -21,12 +21,12 @@ struct Vector3D
     Vector3D(float _x, float _y, float _z) : X(_x), Y(_y), Z(_z){}
 	
 			
-		inline void	Set(const float _x, const float _y, const float _z)
-		{
-				X = _x;
-				Y = _y;
-				Z = _z;
-		}
+	inline void	Set(const float _x, const float _y, const float _z)
+	{
+            X = _x;
+	    Y = _y;
+	    Z = _z;
+	}
 		
 		inline void Set(const Vector3D& v)
 		{
@@ -306,6 +306,21 @@ struct Quaternion
                 axis = Vector3D(0, 0, 0);
                 angle = 0;
             }
+        };
+        
+        
+        inline void ToEuler(Vector3D& euler)const
+        {
+            float ysqr = Y * Y;
+            euler.X = atan2f(2.0f * (W * X + Y * Z), 1.0f - 2.0f * (X * X + ysqr));
+
+            float t2 = 2.0f * (W * Y - Z * X);
+            t2 = t2 > 1.0f ? 1.0f : t2;
+            t2 = t2 < -1.0f ? -1.0f : t2;
+            euler.Y = asinf(t2);
+
+            euler.Z = atan2f(2.0f * (W * Z + X * Y), 1.0f - 2.0f * (ysqr + Z * Z));
+
         };
 
 };

@@ -5,10 +5,10 @@
 #include "i2c_sensor.cpp"
 
 
-//адрес
+//Р°РґСЂРµСЃ
 #define LIS331DLH_I2C_ADDRESS       0x30
  
-//регистры
+//СЂРµРіРёСЃС‚СЂС‹
 #define WHO_AM_I_REG_LIS331DLH      0x0F
 #define LIS331DLH_XOUT_H_REG 				0x29
 #define LIS331DLH_XOUT_L_REG			  0x28
@@ -26,7 +26,7 @@
 #define LIS331DLH_STATUS_REG      	0x27
  
  
-//режимы
+//СЂРµР¶РёРјС‹
 #define POWER_DOWN   								0x6F
 #define NORMAL_50HZ   							0x27
 #define NORMAL_100HZ  				 			0x2F

@@ -1,22 +1,22 @@
 /*
 TODO:
-01. Напряжение
-    - мерить опору
+01. РќР°РїСЂСЏР¶РµРЅРёРµ
+    - РјРµСЂРёС‚СЊ РѕРїРѕСЂСѓ
 
-02. Барометр
-    - драйвер
+02. Р‘Р°СЂРѕРјРµС‚СЂ
+    - РґСЂР°Р№РІРµСЂ
     - DMA
     
-03. Температура
-    - с барометра
-    - с контроллера
+03. РўРµРјРїРµСЂР°С‚СѓСЂР°
+    - СЃ Р±Р°СЂРѕРјРµС‚СЂР°
+    - СЃ РєРѕРЅС‚СЂРѕР»Р»РµСЂР°
     
 04. SBUS
-    - декодировка с помощью *uint32_t
-    - режим синхронизации и приема кадра
+    - РґРµРєРѕРґРёСЂРѕРІРєР° СЃ РїРѕРјРѕС‰СЊСЋ *uint32_t
+    - СЂРµР¶РёРј СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё Рё РїСЂРёРµРјР° РєР°РґСЂР°
     
 05. SPORT
-    - передавать RPY
+    - РїРµСЂРµРґР°РІР°С‚СЊ RPY
     
 */
 
@@ -43,7 +43,7 @@ TODO:
 
 
 
-//переферия
+//РїРµСЂРµС„РµСЂРёСЏ
 GPIO_InitTypeDef  	hgpio;
 TIM_HandleTypeDef 	htim_timer;
 TIM_HandleTypeDef 	htim_motor;
@@ -131,7 +131,7 @@ void taskInitAHRS();
 
 
 
-//приемник
+//РїСЂРёРµРјРЅРёРє
 FrskySport frsky_sport;
 FrskySbus  frsky_sbus;
 bool       new_rc_command = false;
@@ -142,34 +142,37 @@ Vector3D   rc_axis_pitch_roll;
 float      rc_angle;
 Quaternion rc_target_orientation;
 
-//ориентация
+//РѕСЂРёРµРЅС‚Р°С†РёСЏ
 Quaternion targetQuaternion;
 Vector3D targetAxis;
 float targetAngle;
 Vector3D targetErrors;
 Vector3D targetPIDs;
 
-//ось Z
+Vector3D vEuler(0, 0, 0);
+
+//РѕСЃСЊ Z
 Vector3D zAxis(0, 0, 1.0f);
 
-//PID коэффициенты
+//PID РєРѕСЌС„С„РёС†РёРµРЅС‚С‹
  float
         maxValue = 0.30f,
 		kP = 0.30f, maxP = 0.30f,
 		kI = 1.00f, maxI = 0.04f,
 		kD = 0.05f, maxD = 0.10f;
 
-//PIDы по осям
+//PIDС‹ РїРѕ РѕСЃСЏРј
 PID pidX(maxValue, kP, maxP, kI, maxI, kD, maxD);
 PID pidY(maxValue, kP, maxP, kI, maxI, kD, maxD);
 PID pidZ(maxValue * 0.3f, kP, maxP * 0.3f, kI, maxI, kD, maxD); 
 
 
-//Мин и макс сигналы моторов
-uint32_t minMotors = 900,
-         maxMotors = 1700;
+//РњРёРЅ Рё РјР°РєСЃ СЃРёРіРЅР°Р»С‹ РјРѕС‚РѕСЂРѕРІ
+//РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РІ  init() РєРѕРіРґР° Р±СѓРґРµС‚ РёР·РІРµСЃС‚РЅР° SystemCoreClock
+uint32_t minMotors = 0,
+         maxMotors = 0;
 
-//таблица микширования моторов
+//С‚Р°Р±Р»РёС†Р° РјРёРєС€РёСЂРѕРІР°РЅРёСЏ РјРѕС‚РѕСЂРѕРІ
 float mixMotor[4][4] = 
 {
 	{-1,-1,-1, 1},
@@ -180,42 +183,51 @@ float mixMotor[4][4] =
 
 
 
-//сигналы моторов
+//СЃРёРіРЅР°Р»С‹ РјРѕС‚РѕСЂРѕРІ
 float motors[4] = {0,0,0,0};
 
-//газ				 
+//РіР°Р·				 
 float Throttle = 0.0f;
 
 
 
-//сенсоры
+//СЃРµРЅСЃРѕСЂС‹
 L3G4200D        gyroscope       (&hi2c_2, 1.00f);
-LIS331DLH       accelerometer   (&hi2c_2, 1.00f);
-LIS3MDL         magnetometer    (&hi2c, 1.00f);
+LIS331DLH       accelerometer   (&hi2c_2, 0.30f);
+LIS3MDL         magnetometer    (&hi2c, 0.30f);
 I2CSensor3Axis  barometer       (&hi2c_2, 0xB9, 0x27);
 
-//фильтр ориентации
+//С„РёР»СЊС‚СЂ РѕСЂРёРµРЅС‚Р°С†РёРё
 AHRSMahony ahrs_Mahony(1, 0);
 
-//кодировщик телеметрии
+//РєРѕРґРёСЂРѕРІС‰РёРє С‚РµР»РµРјРµС‚СЂРёРё
 TelemetryCoder telemetryCoder(1000);
 
-//декодер GPS
+//РґРµРєРѕРґРµСЂ GPS
 GPSDecoder gpsDecoder(500);
 
-//сообщение gps UBX_NAV_PVT
+//СЃРѕРѕР±С‰РµРЅРёРµ gps UBX_NAV_PVT
 UBX_NAV_PVT ubx_nav_pvt;
 
 
 
-//целевой курс
+//С†РµР»РµРІРѕР№ РєСѓСЂСЃ
 float targetCourse = 0.0f;
-//целевая ориентация
+//С†РµР»РµРІР°СЏ РѕСЂРёРµРЅС‚Р°С†РёСЏ
 Quaternion targetOrientation();
 
 
-//статус инициализации фильтра ориентации
+//СЃС‚Р°С‚СѓСЃ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё С„РёР»СЊС‚СЂР° РѕСЂРёРµРЅС‚Р°С†РёРё
 static uint8_t ahrs_state = 0;
+
+
+//DEBUG
+int32_t presure;
+float presure_mBar;
+float presure_home;
+//DEBUG
+float acceleration;
+float accelerationNormalRange = 0.2;
 
 
 
@@ -259,22 +271,12 @@ float    vbat = 0;
 
 
 HAL_StatusTypeDef hal_status;
-uint8_t d = 0;
 
-
-
-
-uint8_t gps_data[100]; 
-uint8_t gps_count = 0;
-
-uint32_t prev_t = 0;
-uint32_t max_t = 0;
 
 char report_data[1000];
 
-//DEBUG
-int32_t presure;
-float presure_mBar;
+
+
 
 
 
@@ -292,24 +294,15 @@ HAL_StatusTypeDef I2CStatStatus(HAL_StatusTypeDef status, I2CStat* p_stat)
 
 
 
-void taskGPSSend()
-{
-    if(gps_count > 0)
-    {
-        HAL_UART_Transmit(&gps_huart, gps_data, gps_count, 100000);
-        gps_count = 0;
-    }
-}
-
 
 
 int main()
 {   
     
-    //настройка переферии
+    //РЅР°СЃС‚СЂРѕР№РєР° РїРµСЂРµС„РµСЂРёРё
 	init();
     
-    //таймер моторов 
+    //С‚Р°Р№РјРµСЂ РјРѕС‚РѕСЂРѕРІ 
 	HAL_TIM_PWM_Start(&htim_motor, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim_motor, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim_motor, TIM_CHANNEL_3);
@@ -318,7 +311,7 @@ int main()
     
     
     
-    //стоп моторы
+    //СЃС‚РѕРї РјРѕС‚РѕСЂС‹
     htim_motor.Instance->CCR1 = minMotors;
     htim_motor.Instance->CCR2 = minMotors;
     htim_motor.Instance->CCR3 = minMotors;
@@ -326,7 +319,7 @@ int main()
     
     
     
-    //запуск uart'ов    
+    //Р·Р°РїСѓСЃРє uart'РѕРІ    
 	sport_t(1);
     HAL_UART_Receive_IT(&sport_huart, &sport_byte, 1);
     HAL_UART_Receive_IT(&sbus_huart, &sbus_byte, 1);
@@ -334,16 +327,16 @@ int main()
     HAL_UART_Receive_IT(&gps_huart, &gps_byte, 1);
     HAL_UART_Receive_IT(&pc_huart, &pc_byte, 1);
     
-    //запуск АЦП
+    //Р·Р°РїСѓСЃРє РђР¦Рџ
     HAL_ADC_Start(&hadc);
     
     
-    //настройка сенсоров
+    //РЅР°СЃС‚СЂРѕР№РєР° СЃРµРЅСЃРѕСЂРѕРІ
     init_sensors();       
     
     
    
-    //рабочий цикл
+    //СЂР°Р±РѕС‡РёР№ С†РёРєР»
 	while(1)
 	{   
         taskInitAHRS();
@@ -406,17 +399,17 @@ void taskAHRS()
     
     
     
-    //машина состояний опроса гироскопа и акселерометра по i2c1
+    //РјР°С€РёРЅР° СЃРѕСЃС‚РѕСЏРЅРёР№ РѕРїСЂРѕСЃР° РіРёСЂРѕСЃРєРѕРїР° Рё Р°РєСЃРµР»РµСЂРѕРјРµС‚СЂР° РїРѕ i2c1
     switch(step)
 	{    
-        //запрос гироскопа 
+        //Р·Р°РїСЂРѕСЃ РіРёСЂРѕСЃРєРѕРїР° 
         case 0:
 		{
-            //маленькая задержка перед следующей транзакцией
+            //РјР°Р»РµРЅСЊРєР°СЏ Р·Р°РґРµСЂР¶РєР° РїРµСЂРµРґ СЃР»РµРґСѓСЋС‰РµР№ С‚СЂР°РЅР·Р°РєС†РёРµР№
             delay_us(3);
-            //проверка i2c           
+            //РїСЂРѕРІРµСЂРєР° i2c           
             ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
-            //запрос гироскопа по i2c2 
+            //Р·Р°РїСЂРѕСЃ РіРёСЂРѕСЃРєРѕРїР° РїРѕ i2c2 
             if(I2CStatStatus(gyroscope.beginReadAxisDMA(), &i2c_stats[1]) == HAL_OK) 
             {
                 step++;
@@ -424,12 +417,12 @@ void taskAHRS()
 			
 			break;
         }
-		//ждем гироскоп; 
+		//Р¶РґРµРј РіРёСЂРѕСЃРєРѕРї; 
 		case 1:
 		{   
             if(hi2c_2.State == HAL_I2C_STATE_READY)
             {   
-                //если ошибка, возвращаемся назад к запросу гироскопа
+                //РµСЃР»Рё РѕС€РёР±РєР°, РІРѕР·РІСЂР°С‰Р°РµРјСЃСЏ РЅР°Р·Р°Рґ Рє Р·Р°РїСЂРѕСЃСѓ РіРёСЂРѕСЃРєРѕРїР°
                 if(hi2c_2.ErrorCode != HAL_I2C_ERROR_NONE)
                 {   
                     step--;
@@ -443,27 +436,27 @@ void taskAHRS()
 			break;            
 			
 		}
-        //запрос акселерометра; обработка гироскопа; 
+        //Р·Р°РїСЂРѕСЃ Р°РєСЃРµР»РµСЂРѕРјРµС‚СЂР°; РѕР±СЂР°Р±РѕС‚РєР° РіРёСЂРѕСЃРєРѕРїР°; 
         case 2:
         {            
-            //маленькая задержка перед следующей транзакцией
+            //РјР°Р»РµРЅСЊРєР°СЏ Р·Р°РґРµСЂР¶РєР° РїРµСЂРµРґ СЃР»РµРґСѓСЋС‰РµР№ С‚СЂР°РЅР·Р°РєС†РёРµР№
             delay_us(3);
-            //проверка i2c 
+            //РїСЂРѕРІРµСЂРєР° i2c 
             ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);            
-            //запрос акселерометра i2c2
+            //Р·Р°РїСЂРѕСЃ Р°РєСЃРµР»РµСЂРѕРјРµС‚СЂР° i2c2
             if(I2CStatStatus(accelerometer.beginReadAxisDMA(), &i2c_stats[1]) == HAL_OK)
             {
-                //обработка гироскопа
+                //РѕР±СЂР°Р±РѕС‚РєР° РіРёСЂРѕСЃРєРѕРїР°
                 gyroscope.processResult();
                 step++;
             }
         }
-        //обработка акселерометра;
+        //РѕР±СЂР°Р±РѕС‚РєР° Р°РєСЃРµР»РµСЂРѕРјРµС‚СЂР°;
         case 3:
         {   
             if(hi2c_2.State == HAL_I2C_STATE_READY)
             {                
-                //если ошибка, возвращаемся назад к запросу акселерометра
+                //РµСЃР»Рё РѕС€РёР±РєР°, РІРѕР·РІСЂР°С‰Р°РµРјСЃСЏ РЅР°Р·Р°Рґ Рє Р·Р°РїСЂРѕСЃСѓ Р°РєСЃРµР»РµСЂРѕРјРµС‚СЂР°
                 if(hi2c_2.ErrorCode != HAL_I2C_ERROR_NONE)
                 {   
                     step--;
@@ -471,9 +464,9 @@ void taskAHRS()
                 else
                 {     
                     
-                    //обработка акселерометра
+                    //РѕР±СЂР°Р±РѕС‚РєР° Р°РєСЃРµР»РµСЂРѕРјРµС‚СЂР°
                     accelerometer.processResult();
-                    //защелкиваем машину состояний
+                    //Р·Р°С‰РµР»РєРёРІР°РµРј РјР°С€РёРЅСѓ СЃРѕСЃС‚РѕСЏРЅРёР№
                     step = -1;
                 }
             }              
@@ -489,14 +482,14 @@ void taskAHRS()
     {
         case 0:
         {
-            //маленькая задержка перед следующей транзакцией
+            //РјР°Р»РµРЅСЊРєР°СЏ Р·Р°РґРµСЂР¶РєР° РїРµСЂРµРґ СЃР»РµРґСѓСЋС‰РµР№ С‚СЂР°РЅР·Р°РєС†РёРµР№
             delay_us(3);
-            //проверка i2c             
+            //РїСЂРѕРІРµСЂРєР° i2c             
             ensure_I2C(&hi2c, GPIOB, GPIO_PIN_8, GPIO_PIN_9, &i2c_stats[0]);
-            //запрос магнетометра i2c2
+            //Р·Р°РїСЂРѕСЃ РјР°РіРЅРµС‚РѕРјРµС‚СЂР° i2c2
             if(I2CStatStatus(magnetometer.beginReadAxisDMA(), &i2c_stats[0]) == HAL_OK)
             {
-                //обработка акселерометра
+                //РѕР±СЂР°Р±РѕС‚РєР° Р°РєСЃРµР»РµСЂРѕРјРµС‚СЂР°
                 accelerometer.processResult();
                 step1++;
             }
@@ -506,14 +499,14 @@ void taskAHRS()
         {
             if(hi2c.State == HAL_I2C_STATE_READY)
             {                
-                //если ошибка, возвращаемся назад к запросу магнетометра
+                //РµСЃР»Рё РѕС€РёР±РєР°, РІРѕР·РІСЂР°С‰Р°РµРјСЃСЏ РЅР°Р·Р°Рґ Рє Р·Р°РїСЂРѕСЃСѓ РјР°РіРЅРµС‚РѕРјРµС‚СЂР°
                 if(hi2c.ErrorCode != HAL_I2C_ERROR_NONE)
                 {   
                     step1--;
                 }
                 else
                 {     
-                    //обработка магнетометра
+                    //РѕР±СЂР°Р±РѕС‚РєР° РјР°РіРЅРµС‚РѕРјРµС‚СЂР°
                     magnetometer.processResult();
                     step1 = -1;
                 }
@@ -526,45 +519,50 @@ void taskAHRS()
     
     
     
-    //основная машина состояний
+    //РѕСЃРЅРѕРІРЅР°СЏ РјР°С€РёРЅР° СЃРѕСЃС‚РѕСЏРЅРёР№
     switch(state)
     {
-        //пауза
+        //РїР°СѓР·Р°
         case 0:
         {
             if((deltat = (get_time() - time)) >= 2000)
 			{                
 				time = get_time();
-                //ограничиваем сверху (TODO: надо?)
+                //РѕРіСЂР°РЅРёС‡РёРІР°РµРј СЃРІРµСЂС…Сѓ (TODO: РЅР°РґРѕ?)
                 if(deltat > 3000) deltat = 3000; 
-                //запуск опроса датчиков
+                //Р·Р°РїСѓСЃРє РѕРїСЂРѕСЃР° РґР°С‚С‡РёРєРѕРІ
                 step  = 0;
                 step1 = 0;
-                //на ожидание окончания опроса датчиков
+                //РЅР° РѕР¶РёРґР°РЅРёРµ РѕРєРѕРЅС‡Р°РЅРёСЏ РѕРїСЂРѕСЃР° РґР°С‚С‡РёРєРѕРІ
                 state++;
                 
                 timings[0].start(get_time());
             }
             break;
         }       
-        //ожидание окончания опроса датчиков
+        //РѕР¶РёРґР°РЅРёРµ РѕРєРѕРЅС‡Р°РЅРёСЏ РѕРїСЂРѕСЃР° РґР°С‚С‡РёРєРѕРІ
         case 1:
         {
             if(step == -1 && step1 == -1)
             {   
                 timings[0].stop(get_time());
                 
-                //расчет текущей ориентации
+                //РёСЃРїРѕР»СЊР·СѓРµРј Р°РєСЃРµР»РµСЂРѕРјРµС‚СЂ С‚РѕР»СЊРєРѕ РІ Р±РѕР»РµРµ-РјРµРЅРµРµ СЃРїРѕРєРѕР№РЅРѕРј СЃРѕСЃС‚РѕСЏРЅРёРё
+                acceleration = accelerometer.result.GetLength();
+                bool useAcc = (acceleration > 1.0f - accelerationNormalRange) && (acceleration < 1.0f + accelerationNormalRange);
+                
+                //СЂР°СЃС‡РµС‚ С‚РµРєСѓС‰РµР№ РѕСЂРёРµРЅС‚Р°С†РёРё
                 ahrs_Mahony.Update
                 (
                     gyroscope.result.X, gyroscope.result.Y, gyroscope.result.Z,
                     accelerometer.result.X, accelerometer.result.Y, accelerometer.result.Z,                    
                     magnetometer.result.X, magnetometer.result.Y, magnetometer.result.Z,
-                    deltat * 0.000001f
+                    deltat * 0.000001f,
+                    useAcc
                 );
                 
                 
-                //... и сразу стабилизация
+                //... Рё СЃСЂР°Р·Сѓ СЃС‚Р°Р±РёР»РёР·Р°С†РёСЏ
                 taskStabilization(deltat * 0.000001f);
                    
                 
@@ -577,6 +575,7 @@ void taskAHRS()
                     
                     presure = (int32_t)(int8_t)barometer.data[3] << 16 | (uint16_t)barometer.data[2] << 8 | barometer.data[1];
                     presure_mBar = presure_mBar * 0.97f + ((float)presure / 4096) * 0.03f;
+                                        
                 }
                 
                 
@@ -607,11 +606,11 @@ void taskStabilization(float deltat)
 
     if(frsky_sbus.is_data_done(get_time())) //DEBUG
     {
-        //читаем приемник
+        //С‡РёС‚Р°РµРј РїСЂРёРµРјРЅРёРє
         Throttle = frsky_sbus.get_channel_throttle();
-        rc_axis_x = frsky_sbus.get_channel_axis_x();
-        rc_axis_y = frsky_sbus.get_channel_axis_y();
-        rc_axis_z = frsky_sbus.get_channel_axis_z();
+        rc_axis_x = frsky_sbus.get_channel_axis_x(0.02f);
+        rc_axis_y = frsky_sbus.get_channel_axis_y(0.008f);
+        rc_axis_z = frsky_sbus.get_channel_axis_z(0.008f);
     }
     else
     {
@@ -619,49 +618,46 @@ void taskStabilization(float deltat)
     }
     
     
-    //интегрируем угол курса
-    if(fabs(rc_axis_z) > 0.02f)
-    {
-        targetCourse += -rc_axis_z * 0.003f;
-        if(targetCourse >  PI2) targetCourse -= PI2;
-        if(targetCourse < -PI2) targetCourse += PI2;
-    }
+    //РёРЅС‚РµРіСЂРёСЂСѓРµРј СѓРіРѕР» РєСѓСЂСЃР°
+    targetCourse += -rc_axis_z * 0.003f;
+    if(targetCourse >  PI2) targetCourse -= PI2;
+    if(targetCourse < -PI2) targetCourse += PI2;
     
     
-    //ось крена-тангажа
+    //РѕСЃСЊ РєСЂРµРЅР°-С‚Р°РЅРіР°Р¶Р°
     rc_axis_pitch_roll.Set(rc_axis_y, rc_axis_x, 0.0); 
     rc_axis_pitch_roll.Normalize();
-    //угол крена-тангажа
+    //СѓРіРѕР» РєСЂРµРЅР°-С‚Р°РЅРіР°Р¶Р°
     rc_angle = 0.50f * (fabs(rc_axis_x) > fabs(rc_axis_y) ? fabs(rc_axis_x) : fabs(rc_axis_y));								
-    //кватернион крена тангажа
+    //РєРІР°С‚РµСЂРЅРёРѕРЅ РєСЂРµРЅР° С‚Р°РЅРіР°Р¶Р°
     Quaternion qPR = Quaternion::FromAxisAngle(rc_axis_pitch_roll, rc_angle);
     
-    //кватернион курса
+    //РєРІР°С‚РµСЂРЅРёРѕРЅ РєСѓСЂСЃР°
     Quaternion qC = Quaternion::FromAxisAngle(zAxis, targetCourse);
-    //целевой кватернион
+    //С†РµР»РµРІРѕР№ РєРІР°С‚РµСЂРЅРёРѕРЅ
     rc_target_orientation = qC * qPR;
     
     
-    //кватернион поворота из текущей ориентации в целевую
+    //РєРІР°С‚РµСЂРЅРёРѕРЅ РїРѕРІРѕСЂРѕС‚Р° РёР· С‚РµРєСѓС‰РµР№ РѕСЂРёРµРЅС‚Р°С†РёРё РІ С†РµР»РµРІСѓСЋ
     targetQuaternion = ahrs_Mahony.Q.Conjugated() * rc_target_orientation;
     
-    //выбираем кратчайшее направление
+    //РІС‹Р±РёСЂР°РµРј РєСЂР°С‚С‡Р°Р№С€РµРµ РЅР°РїСЂР°РІР»РµРЅРёРµ
     if(targetQuaternion.W < 0)
     {
         targetQuaternion = -targetQuaternion;
     }
     
-    //переводим в ось и угол
+    //РїРµСЂРµРІРѕРґРёРј РІ РѕСЃСЊ Рё СѓРіРѕР»
     targetQuaternion.ToAxisAngle(targetAxis, targetAngle);
     
-    //текущие ошибки по осям
+    //С‚РµРєСѓС‰РёРµ РѕС€РёР±РєРё РїРѕ РѕСЃСЏРј
     targetErrors.Set(
         targetAxis.X * targetAngle / PI,
         targetAxis.Y * targetAngle / PI,
         targetAxis.Z * targetAngle / PI
     );
     
-    //значения регуляторов
+    //Р·РЅР°С‡РµРЅРёСЏ СЂРµРіСѓР»СЏС‚РѕСЂРѕРІ
     targetPIDs.Set(
         pidX.get(targetErrors.X, deltat),
         pidY.get(targetErrors.Y, deltat),
@@ -675,14 +671,14 @@ void taskStabilization(float deltat)
     for(int i = 0; i < 4; i++)
     {
         motors[i] = 
-            //газ
+            //РіР°Р·
             Throttle +
-            //pidы по осям
+            //pidС‹ РїРѕ РѕСЃСЏРј
             mixMotor[i][0] * targetPIDs.X +
             mixMotor[i][1] * targetPIDs.Y +
             mixMotor[i][2] * targetPIDs.Z;
         
-        //определяем минимальный и максимальный сигнал
+        //РѕРїСЂРµРґРµР»СЏРµРј РјРёРЅРёРјР°Р»СЊРЅС‹Р№ Рё РјР°РєСЃРёРјР°Р»СЊРЅС‹Р№ СЃРёРіРЅР°Р»
         if(i == 0)
         {
             max = min = motors[0];
@@ -694,7 +690,7 @@ void taskStabilization(float deltat)
         }
     }
     
-    //корректирум сигналы, чтобы значения не выходили за 100%
+    //РєРѕСЂСЂРµРєС‚РёСЂСѓРј СЃРёРіРЅР°Р»С‹, С‡С‚РѕР±С‹ Р·РЅР°С‡РµРЅРёСЏ РЅРµ РІС‹С…РѕРґРёР»Рё Р·Р° 100%
     float overdrive = max - 1.0f;
     if(overdrive > 0.0f)
     {
@@ -751,7 +747,7 @@ void taskControl()
                
             }
         
-            //пиды
+            //РїРёРґС‹
             float p     = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.50f); 
             float i     = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 3.00f); 
             float _maxI = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.07f); 
@@ -764,6 +760,12 @@ void taskControl()
             pidX.kI = pidY.kI = pidZ.kI = i;
             pidX.maxI = pidY.maxI = pidZ.maxI = _maxI;            
             pidX.kD = pidY.kD = pidZ.kD = d;
+            
+            //СѓСЃС‚Р°РЅРѕРІРєР° РґРѕРјР°С€РЅРµРіРѕ РґР°РІР»РµРЅРёСЏ
+            if (frsky_sbus.channels[11] == 0x0713 )
+            {
+                presure_home = presure_mBar;
+            }
         }
     }
 }
@@ -773,6 +775,7 @@ void taskControl()
 void taskTelemetry()
 {    
     static uint32_t reportTime = 0;
+    static uint32_t sportTime = 0;
     
     if (HAL_ADC_PollForConversion(&hadc, 10) == HAL_OK)
     {
@@ -780,12 +783,27 @@ void taskTelemetry()
         vbat = vbat * 0.9999f  + (adc_value * 3.3f * 11.86f / 4095) * 0.0001f;
     }
     
+    //S.PORT
+    if(get_time() - sportTime >= 20000)
+    {
+        sportTime = get_time();
+        
+        frsky_sport.telemetry_current = 23.4f + ((HAL_GetTick() % 3) * 0.3f);
+        frsky_sport.telemetry_vbat = vbat;
+        
+        ahrs_Mahony.Q.ToEuler(vEuler);        
+        frsky_sport.telemetry_acc_x = vEuler.X * RAD_TO_GRAD;
+        frsky_sport.telemetry_acc_y = vEuler.Y * RAD_TO_GRAD;
+        frsky_sport.telemetry_acc_z = vEuler.Z * RAD_TO_GRAD;
+        
+        frsky_sport.telemetry_alt = 18400 * (1 + 0.003665 * 20) * log10f(presure_home / presure_mBar);
+        
+        frsky_sport.telemetry_gps_lat = ubx_nav_pvt.lat;
+        frsky_sport.telemetry_gps_lon = ubx_nav_pvt.lon;
+        
+    }
     
-    frsky_sport.telemetry_current = 23.4f + ((HAL_GetTick() % 3) * 0.3f);
-    frsky_sport.telemetry_vbat = vbat;
-    
-    
-    
+    //modem
     if((get_time() - reportTime >= 65000)  && (modem_huart.gState == HAL_UART_STATE_READY) && (__HAL_UART_GET_FLAG(&modem_huart, UART_FLAG_TC)))
 	{        
         reportTime = get_time();
@@ -871,33 +889,33 @@ void taskReport()
 ///////////// AUX FUNCTIONS /////////////
 /////////////////////////////////////////
 
-//получить время в микросекундах
+//РїРѕР»СѓС‡РёС‚СЊ РІСЂРµРјСЏ РІ РјРёРєСЂРѕСЃРµРєСѓРЅРґР°С…
 uint32_t get_time()
 {
 	return TIM5->CNT;
 }
 
-//задержка в микросекундах
+//Р·Р°РґРµСЂР¶РєР° РІ РјРёРєСЂРѕСЃРµРєСѓРЅРґР°С…
 void delay_us(uint32_t us)
 {
     uint32_t t = get_time();
     while(get_time() - t < us);
 }
 
-//настройка сенсоров
+//РЅР°СЃС‚СЂРѕР№РєР° СЃРµРЅСЃРѕСЂРѕРІ
 void init_sensors()
 {
-    //задержка, чтобы успеть убрать руки
+    //Р·Р°РґРµСЂР¶РєР°, С‡С‚РѕР±С‹ СѓСЃРїРµС‚СЊ СѓР±СЂР°С‚СЊ СЂСѓРєРё
     delay_us(3000000);
     
-    //проверка i2c 
+    //РїСЂРѕРІРµСЂРєР° i2c 
     ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
     
-     //включение, скорость выходных данных
+     //РІРєР»СЋС‡РµРЅРёРµ, СЃРєРѕСЂРѕСЃС‚СЊ РІС‹С…РѕРґРЅС‹С… РґР°РЅРЅС‹С…
 	gyroscope.writeRegister(L3G4200D_CTRL_REG1, 0xCF, 10);
-	//диапазон
+	//РґРёР°РїР°Р·РѕРЅ
 	gyroscope.setRange(L3G4200D_RANGE_500, 1, 10);
-	//калибровка
+	//РєР°Р»РёР±СЂРѕРІРєР°
 	//gyroscope.calibrate(500, 1, 10);
     Vector3D v; 
     uint32_t times = 5000;
@@ -919,16 +937,16 @@ void init_sensors()
     
 	
 	
-	//акселерометр
+	//Р°РєСЃРµР»РµСЂРѕРјРµС‚СЂ
 	accelerometer.writeRegister(LIS331DLH_CTRL_REG_1, 0x3F, 10);
-	accelerometer.writeRegister(LIS331DLH_CTRL_REG_4, 0x90, 10);
-	accelerometer.offset.Set(56.89f, -477.30f, 497.13f);	
-	accelerometer.scaleFactor[0].Set(0.000121f, 0.000003f, 0.000000f);
-	accelerometer.scaleFactor[1].Set(0.000002f, 0.000121f, 0.000000f);
-	accelerometer.scaleFactor[2].Set(-0.000000f, 0.000000f, 0.000121f);
+	accelerometer.writeRegister(LIS331DLH_CTRL_REG_4, 0x80, 10); //+-2G
+	accelerometer.offset.Set(485.79f, -529.53f, 290.00f);	
+	accelerometer.scaleFactor[0].Set(0.000060f, 0.000001f, 0.000000f);
+	accelerometer.scaleFactor[1].Set(0.000001f, 0.000060f, 0.000000f);
+	accelerometer.scaleFactor[2].Set(0.000000f, 0.000000f, 0.000060f);
 	
 		
-	//магнетометр    
+	//РјР°РіРЅРµС‚РѕРјРµС‚СЂ    
 	magnetometer.writeRegister(LIS3MDL_CTRL_REG1, 0x22, 10);
     magnetometer.writeRegister(LIS3MDL_CTRL_REG3, 0x00, 10);
     magnetometer.writeRegister(LIS3MDL_CTRL_REG4, 0x04, 10);
@@ -940,13 +958,20 @@ void init_sensors()
     
   
     
-    //барометр
+    //Р±Р°СЂРѕРјРµС‚СЂ
     barometer.writeRegister(0x10, 0x6A, 10);
     barometer.writeRegister(0x20, 0xF4, 10);
+    
+    //РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РґР°РІР»РµРЅРёСЏ
+    ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
+    barometer.readAxis(10);
+    presure = (int32_t)(int8_t)barometer.data[3] << 16 | (uint16_t)barometer.data[2] << 8 | barometer.data[1];
+    presure_mBar = ((float)presure / 4096);
+    presure_home = presure_mBar;
 }
 
 
-//разрешить передачу SPORT
+//СЂР°Р·СЂРµС€РёС‚СЊ РїРµСЂРµРґР°С‡Сѓ SPORT
 void sport_t(bool v)
 {
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, v ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -954,7 +979,7 @@ void sport_t(bool v)
 
 void I2C_manual_slave_clocking(GPIO_TypeDef* p_port, uint16_t scl_pin, uint16_t sda_pin)
 {
-    //настраиваем порт, как выход общего назначения с открытым коллетором
+    //РЅР°СЃС‚СЂР°РёРІР°РµРј РїРѕСЂС‚, РєР°Рє РІС‹С…РѕРґ РѕР±С‰РµРіРѕ РЅР°Р·РЅР°С‡РµРЅРёСЏ СЃ РѕС‚РєСЂС‹С‚С‹Рј РєРѕР»Р»РµС‚РѕСЂРѕРј
     hgpio.Pin = scl_pin | sda_pin;
 	hgpio.Mode = GPIO_MODE_OUTPUT_OD;
 	hgpio.Pull = GPIO_NOPULL;
@@ -962,22 +987,22 @@ void I2C_manual_slave_clocking(GPIO_TypeDef* p_port, uint16_t scl_pin, uint16_t 
 	HAL_GPIO_Init(p_port, &hgpio);
     
     
-    //отпускаем линии SCL и SDA
+    //РѕС‚РїСѓСЃРєР°РµРј Р»РёРЅРёРё SCL Рё SDA
     HAL_GPIO_WritePin(p_port, scl_pin | sda_pin, GPIO_PIN_SET);
     
-    //клокаем SCL 8 (байт) + 1 (NACK) раз
+    //РєР»РѕРєР°РµРј SCL 8 (Р±Р°Р№С‚) + 1 (NACK) СЂР°Р·
     for(int i = 0; i < 9; i++)
     {
-        //притягиваем к земле
+        //РїСЂРёС‚СЏРіРёРІР°РµРј Рє Р·РµРјР»Рµ
         HAL_GPIO_WritePin(p_port, scl_pin, GPIO_PIN_RESET);
         delay_us(3);
-        //отпускаем
+        //РѕС‚РїСѓСЃРєР°РµРј
         HAL_GPIO_WritePin(p_port, scl_pin, GPIO_PIN_SET);
         delay_us(3);
     }
     
     
-    //настраиваем порт, для работы с I2C
+    //РЅР°СЃС‚СЂР°РёРІР°РµРј РїРѕСЂС‚, РґР»СЏ СЂР°Р±РѕС‚С‹ СЃ I2C
     hgpio.Pin = scl_pin | sda_pin;
 	hgpio.Mode = GPIO_MODE_AF_OD;
 	hgpio.Pull = GPIO_NOPULL;
@@ -987,8 +1012,8 @@ void I2C_manual_slave_clocking(GPIO_TypeDef* p_port, uint16_t scl_pin, uint16_t 
   
 }
 
-//провека зависания мастера I2C
-//TODO: проверить, что отвис слэйв
+//РїСЂРѕРІРµРєР° Р·Р°РІРёСЃР°РЅРёСЏ РјР°СЃС‚РµСЂР° I2C
+//TODO: РїСЂРѕРІРµСЂРёС‚СЊ, С‡С‚Рѕ РѕС‚РІРёСЃ СЃР»СЌР№РІ
 void ensure_I2C(I2C_HandleTypeDef* h, GPIO_TypeDef* p_port, uint16_t scl_pin, uint16_t sda_pin, I2CStat* p_stat)
 {    
     if(__HAL_I2C_GET_FLAG(h, I2C_FLAG_BUSY) == SET)
@@ -1008,7 +1033,7 @@ void ensure_I2C(I2C_HandleTypeDef* h, GPIO_TypeDef* p_port, uint16_t scl_pin, ui
     
 }
 
-//сброс i2c
+//СЃР±СЂРѕСЃ i2c
 void reinit_I2C(I2C_HandleTypeDef* h)
 {   
     h->Instance->CR1 |= I2C_CR1_SWRST;
@@ -1388,9 +1413,9 @@ void init()
     hi2c.Init.OwnAddress1     = 0;
     hi2c.Init.OwnAddress2     = 0;    
 	
-    //программный сброс и инициализация
+    //РїСЂРѕРіСЂР°РјРјРЅС‹Р№ СЃР±СЂРѕСЃ Рё РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ
     reinit_I2C(&hi2c);
-    //проверка i2c
+    //РїСЂРѕРІРµСЂРєР° i2c
     ensure_I2C(&hi2c, GPIOB, GPIO_PIN_8, GPIO_PIN_9, &i2c_stats[0]);
 	
 	
@@ -1448,9 +1473,9 @@ void init()
     hi2c_2.Init.OwnAddress2     = 0;
 	
     
-    //программный сброс и инициализация
+    //РїСЂРѕРіСЂР°РјРјРЅС‹Р№ СЃР±СЂРѕСЃ Рё РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ
     reinit_I2C(&hi2c_2);
-    //проверка i2c
+    //РїСЂРѕРІРµСЂРєР° i2c
     ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
     
     
@@ -1489,12 +1514,18 @@ void init()
 	/************** Motors ****************/
 	/**************************************/
 
+    //РїРµСЂРµРІРѕРґ РјРёРєСЂРѕСЃРµРєСѓРЅРґ РІ С‚РёРєРё
+    uint32_t us_scale = (uint32_t) (SystemCoreClock / 1000000);
+    //TODO: РїРѕРёРіСЂР°С‚СЊСЃСЏ (may be 700::1900 or 800:1800 e.t.c.)
+    minMotors =  900 * us_scale;
+    maxMotors = 1700 * us_scale;
+    
     /************** Motors::Timer *****************/
-	htim_motor.Instance = TIM3;
-	htim_motor.Init.Period = 4000; 
-    htim_motor.Init.Prescaler = (uint32_t) ((SystemCoreClock / 1000000) - 1); 
+    htim_motor.Instance = TIM3;
+    htim_motor.Init.Period = 2000 * us_scale;          //500Hz
+    htim_motor.Init.Prescaler = 0;                     //Max resolution
     htim_motor.Init.ClockDivision = 0; 
-    htim_motor.Init.CounterMode = TIM_COUNTERMODE_UP; 
+    htim_motor.Init.CounterMode = TIM_COUNTERMODE_UP;
 	
 	HAL_TIM_PWM_Init(&htim_motor);
 	

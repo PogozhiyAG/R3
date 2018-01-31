@@ -284,6 +284,11 @@
           <WinNumber>1</WinNumber>
           <ItemText>Throttle</ItemText>
         </Ww>
+        <Ww>
+          <count>21</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>acceleration</ItemText>
+        </Ww>
       </WatchWindow1>
       <WatchWindow2>
         <Ww>

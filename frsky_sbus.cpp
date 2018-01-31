@@ -4,6 +4,8 @@
 #include "stdint.h"
 #include "utils.cpp"
 
+#include <math.h>
+
 
 #define FRSKY_SBUS_FRAME_LENGTH     25
 #define FRSKY_BUFFER_LENGTH         25
@@ -20,7 +22,7 @@
 
 class FrskySbus
 {
-	public:			
+    public:			
     uint8_t data[FRSKY_BUFFER_LENGTH];
     int16_t channels[16];
     bool    is_frame_lost;
@@ -29,7 +31,7 @@ class FrskySbus
     int32_t ptr;	
     int32_t start;
     int32_t fill;
-    //время последнего кадра
+    //РІСЂРµРјСЏ РїРѕСЃР»РµРґРЅРµРіРѕ РєР°РґСЂР°
     uint32_t last_frame_time;
     uint32_t frames_count;
 	
@@ -99,18 +101,18 @@ class FrskySbus
 		return mapf(channels[FRSKY_CHANNEL_THROTTLE], FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.0, 1.0);
 	}
 	
-	float get_channel_axis_x()
+	float get_channel_axis_x(float dead_band = 0.0f)
 	{
-		return mapf(channels[FRSKY_CHANNEL_AXIS_X], FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, -1.0, 1.0);
+		return deadband(mapf(channels[FRSKY_CHANNEL_AXIS_X], FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, -1.0, 1.0), dead_band);
 	}
 	
-	float get_channel_axis_y()
+	float get_channel_axis_y(float dead_band = 0.0f)
 	{
-		return mapf(channels[FRSKY_CHANNEL_AXIS_Y], FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, -1.0, 1.0);
+		return deadband(mapf(channels[FRSKY_CHANNEL_AXIS_Y], FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, -1.0, 1.0), dead_band);
 	}
-	float get_channel_axis_z()
+	float get_channel_axis_z(float dead_band = 0.0f)
 	{
-		return mapf(channels[FRSKY_CHANNEL_AXIS_Z], FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, -1.0, 1.0);
+		return deadband(mapf(channels[FRSKY_CHANNEL_AXIS_Z], FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, -1.0, 1.0), dead_band);
 	}
 	
 	
@@ -119,6 +121,13 @@ class FrskySbus
 	{
 			return (value < 0) ? FRSKY_BUFFER_LENGTH + (value % FRSKY_BUFFER_LENGTH) : (value % FRSKY_BUFFER_LENGTH);
 	}
+    
+    inline float deadband(float value, float dead_band)
+    {
+        if(fabs(value) < fabs(dead_band))
+            value = 0.0f;
+        return value;
+    }
 };
 
 
