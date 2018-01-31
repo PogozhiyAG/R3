@@ -7,7 +7,7 @@
 #include "utils.cpp"
 
 
-//датчик i2c
+//РґР°С‚С‡РёРє i2c
 class I2CSensor
 {
 	public:
@@ -16,13 +16,13 @@ class I2CSensor
 	
 	    I2CSensor(I2C_HandleTypeDef* _hi2c, uint16_t _address) : hi2c(_hi2c), address(_address){}
 	
-		//записать значение в регистр
+		//Р·Р°РїРёСЃР°С‚СЊ Р·РЅР°С‡РµРЅРёРµ РІ СЂРµРіРёСЃС‚СЂ
 		HAL_StatusTypeDef readRegister(uint16_t reg, uint8_t* pValue, uint32_t timeout)
 		{	
             return HAL_I2C_Mem_Read(hi2c, address, reg, I2C_MEMADD_SIZE_8BIT, pValue, 1, timeout);
 		}
 		
-		//прочитать значение из регистра
+		//РїСЂРѕС‡РёС‚Р°С‚СЊ Р·РЅР°С‡РµРЅРёРµ РёР· СЂРµРіРёСЃС‚СЂР°
 		HAL_StatusTypeDef writeRegister(uint16_t reg, uint8_t value, uint32_t timeout)
 		{
 			return HAL_I2C_Mem_Write(hi2c, address, reg, I2C_MEMADD_SIZE_8BIT, &value, 1, timeout);
@@ -30,7 +30,7 @@ class I2CSensor
 };
 
 
-//трехосевой датчик i2c
+//С‚СЂРµС…РѕСЃРµРІРѕР№ РґР°С‚С‡РёРє i2c
 class I2CSensor3Axis : public I2CSensor
 {	
 	public:	
@@ -69,13 +69,13 @@ class I2CSensor3Axis : public I2CSensor
 };
 
 
-//трехосевой датчик i2c с фильтром низких частот
+//С‚СЂРµС…РѕСЃРµРІРѕР№ РґР°С‚С‡РёРє i2c СЃ С„РёР»СЊС‚СЂРѕРј РЅРёР·РєРёС… С‡Р°СЃС‚РѕС‚
 class I2CSensor3AxisLPF : public I2CSensor3Axis
 {
 	public:
-		//коэффициент фильтра низких частот
+		//РєРѕСЌС„С„РёС†РёРµРЅС‚ С„РёР»СЊС‚СЂР° РЅРёР·РєРёС… С‡Р°СЃС‚РѕС‚
 		float lpfK;
-		//результ
+		//СЂРµР·СѓР»СЊС‚
 		Vector3D result;
 		
 		I2CSensor3AxisLPF(I2C_HandleTypeDef* _hi2c, uint16_t _address, uint16_t _firstAxisRegisterAddress, float _lpfK) : I2CSensor3Axis(_hi2c, _address, _firstAxisRegisterAddress), lpfK(_lpfK)

@@ -111,7 +111,7 @@ class L3G4200D : public I2CSensor3AxisLPF
 		
 		virtual void processResult()
         {
-            //TODO: Пересмотреть методы
+            //TODO: РџРµСЂРµСЃРјРѕС‚СЂРµС‚СЊ РјРµС‚РѕРґС‹
 			processAxis();
             
 			result.X = (1 - lpfK) * result.X + lpfK * (axis[0] - offset.X) * rpsRate;

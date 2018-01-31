@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-//отображение значения с одного диапазонв на другой
+//РѕС‚РѕР±СЂР°Р¶РµРЅРёРµ Р·РЅР°С‡РµРЅРёСЏ СЃ РѕРґРЅРѕРіРѕ РґРёР°РїР°Р·РѕРЅРІ РЅР° РґСЂСѓРіРѕР№
 inline float mapf(float x, float in_min, float in_max, float out_min, float out_max)
 {
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;

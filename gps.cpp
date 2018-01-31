@@ -7,17 +7,17 @@
 
 
 
-//Заголовок сообщения UBX
+//Р—Р°РіРѕР»РѕРІРѕРє СЃРѕРѕР±С‰РµРЅРёСЏ UBX
 #define UBX_MSG_HEADER_L 0xB5
 #define UBX_MSG_HEADER_H 0x62
 
 
-//Коды сообщений
+//РљРѕРґС‹ СЃРѕРѕР±С‰РµРЅРёР№
 //UBX-NAV-PVT Navigation Position Velocity Time Solution
 #define MSG_ID_UBX_NAV_PVT 0x0701
 
 
-//Сообщение протокола UBX UBX-NAV-PVT (0x01 0x07) 
+//РЎРѕРѕР±С‰РµРЅРёРµ РїСЂРѕС‚РѕРєРѕР»Р° UBX UBX-NAV-PVT (0x01 0x07) 
 struct UBX_NAV_PVT
 {
     uint32_t iTOW;
@@ -133,7 +133,7 @@ class GPSDecoder
                     }
                     case GPSDecoderState::Payload :
                     {
-                        //защита от переполнения буфера
+                        //Р·Р°С‰РёС‚Р° РѕС‚ РїРµСЂРµРїРѕР»РЅРµРЅРёСЏ Р±СѓС„РµСЂР°
                         if(cnt >= buffer_size)
                         {
                             state = GPSDecoderState::Header;

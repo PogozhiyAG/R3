@@ -22,7 +22,7 @@
 
 class FrskySbus
 {
-	public:			
+    public:			
     uint8_t data[FRSKY_BUFFER_LENGTH];
     int16_t channels[16];
     bool    is_frame_lost;
@@ -31,7 +31,7 @@ class FrskySbus
     int32_t ptr;	
     int32_t start;
     int32_t fill;
-    //время последнего кадра
+    //РІСЂРµРјСЏ РїРѕСЃР»РµРґРЅРµРіРѕ РєР°РґСЂР°
     uint32_t last_frame_time;
     uint32_t frames_count;
 	

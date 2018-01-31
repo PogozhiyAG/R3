@@ -46,19 +46,19 @@
 
 class FrskySport{
 	public:		
-	//контрольная сумма
+	//РєРѕРЅС‚СЂРѕР»СЊРЅР°СЏ СЃСѓРјРјР°
     uint16_t crc;
   
     uint8_t sensorDataPtr;
 
-    //предыдущий прочитанный байт
+    //РїСЂРµРґС‹РґСѓС‰РёР№ РїСЂРѕС‡РёС‚Р°РЅРЅС‹Р№ Р±Р°Р№С‚
     uint8_t prevData;
 	  
-    //буфер для отправки сообщения телеметрии
+    //Р±СѓС„РµСЂ РґР»СЏ РѕС‚РїСЂР°РІРєРё СЃРѕРѕР±С‰РµРЅРёСЏ С‚РµР»РµРјРµС‚СЂРёРё
     uint8_t messageBuffer[FRSKY_MESSAGE_BUFFER_LENGTH];
-    //указатель на конец сообщения в буфере
+    //СѓРєР°Р·Р°С‚РµР»СЊ РЅР° РєРѕРЅРµС† СЃРѕРѕР±С‰РµРЅРёСЏ РІ Р±СѓС„РµСЂРµ
     uint8_t messageBufferEnd; 
-    //указатель на текущий байт в буфере
+    //СѓРєР°Р·Р°С‚РµР»СЊ РЅР° С‚РµРєСѓС‰РёР№ Р±Р°Р№С‚ РІ Р±СѓС„РµСЂРµ
     uint8_t messageBufferCurrent;
 
 
@@ -73,7 +73,7 @@ class FrskySport{
     
     
 
-	//конструктор
+	//РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ
 	FrskySport()
 	{		
 		crc = 0;		
@@ -83,7 +83,7 @@ class FrskySport{
 		messageBufferCurrent = 0;
 	}
 	
-	//сброс указателей буфера
+	//СЃР±СЂРѕСЃ СѓРєР°Р·Р°С‚РµР»РµР№ Р±СѓС„РµСЂР°
     void beginMessage()
 	{		
 		messageBufferEnd = messageBufferCurrent = 0;
@@ -169,7 +169,7 @@ class FrskySport{
 	{	
 		bool result = false;
 					
-		//начало запроса на телеметрию
+		//РЅР°С‡Р°Р»Рѕ Р·Р°РїСЂРѕСЃР° РЅР° С‚РµР»РµРјРµС‚СЂРёСЋ
 		if(prevData == FRSKY_TELEMETRY_START_FRAME)
 		{
 			switch(data)
@@ -181,7 +181,7 @@ class FrskySport{
                     if(sensorDataPtr == 2) sportSetMessage(FRSKY_ACCX_ID, (int32_t)(telemetry_acc_x * 100));
                     if(sensorDataPtr == 3) sportSetMessage(FRSKY_ACCY_ID, (int32_t)(telemetry_acc_y * 100));
                     if(sensorDataPtr == 4) sportSetMessage(FRSKY_ACCZ_ID, (int32_t)(telemetry_acc_z * 100));
-                    if(sensorDataPtr == 5) sportSetMessage(FRSKY_ALT_ID,  (int32_t)(telemetry_alt * 100 + 810)); //TODO: Шо за 810?
+                    if(sensorDataPtr == 5) sportSetMessage(FRSKY_ALT_ID,  (int32_t)(telemetry_alt * 100 + 810)); //TODO: РЁРѕ Р·Р° 810?
                     if(sensorDataPtr == 6) sportSetMessage(FRSKY_GPS_LON_LAT_ID, (int32_t)get_gps_lon_lat(true));
                     if(sensorDataPtr == 7) sportSetMessage(FRSKY_GPS_LON_LAT_ID, (int32_t)get_gps_lon_lat(false));
                                         
