@@ -308,16 +308,13 @@ int main()
     HAL_TIM_PWM_Start(&htim_motor, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim_motor, TIM_CHANNEL_4);
     
-    
-    
-    
+        
     //стоп моторы
     htim_motor.Instance->CCR1 = minMotors;
     htim_motor.Instance->CCR2 = minMotors;
     htim_motor.Instance->CCR3 = minMotors;
     htim_motor.Instance->CCR4 = minMotors;            
-    
-    
+        
     
     //запуск uart'ов    
 	sport_t(1);
@@ -748,10 +745,10 @@ void taskControl()
             }
         
             //пиды
-            float p     = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.50f); 
+            float p     = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
             float i     = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 3.00f); 
             float _maxI = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.07f); 
-            float d     = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.50f); 
+            float d     = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
             
             
             //pidZ.kP = (pidX.kP = pidY.kP = p) * 3.0f;
@@ -1513,17 +1510,16 @@ void init()
 	/**************************************/
 	/************** Motors ****************/
 	/**************************************/
-
-    //перевод микросекунд в тики
-    uint32_t us_scale = (uint32_t) (SystemCoreClock / 1000000);
+    
+    /*500Hz*/
     //TODO: поиграться (may be 700::1900 or 800:1800 e.t.c.)
-    minMotors =  900 * us_scale;
-    maxMotors = 1700 * us_scale;
+    minMotors =  900 * 30;
+    maxMotors = 1900 * 30;
     
     /************** Motors::Timer *****************/
     htim_motor.Instance = TIM3;
-    htim_motor.Init.Period = 2000 * us_scale;          //500Hz
-    htim_motor.Init.Prescaler = 0;                     //Max resolution
+    htim_motor.Init.Period = 2000 * 30;
+    htim_motor.Init.Prescaler = 6 - 1;
     htim_motor.Init.ClockDivision = 0; 
     htim_motor.Init.CounterMode = TIM_COUNTERMODE_UP;
 	
