@@ -735,14 +735,7 @@ void taskControl()
         time = get_time();
         
         if(frsky_sbus.is_data_done(time))
-        {
-            if(ahrs_state == 2)
-            {
-           
-                //ahrs_Mahony.twoKp = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00000f, 2.000f); 
-                //ahrs_Mahony.twoKi = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00000f, 0.200f); 
-               
-            }
+        {            
         
             //пиды
             float p     = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
@@ -758,14 +751,25 @@ void taskControl()
             pidX.maxI = pidY.maxI = pidZ.maxI = _maxI;            
             pidX.kD = pidY.kD = pidZ.kD = d;
             
+            //DEBUG
             //установка домашнего давления
             if (frsky_sbus.channels[11] == 0x0713 )
             {
                 presure_home = presure_mBar;
             }
         }
+        else
+        {
+            pidX.kP = pidY.kP = pidZ.kP = 0.40f ;
+            pidX.kI = pidY.kI = pidZ.kI = 0.05f;
+            pidX.maxI = pidY.maxI = pidZ.maxI = 0.035f;            
+            pidX.kD = pidY.kD = pidZ.kD = 0.20f;
+        }
     }
 }
+
+
+
 
 
 
