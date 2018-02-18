@@ -141,6 +141,7 @@ float      rc_axis_z;
 Vector3D   rc_axis_pitch_roll;
 float      rc_angle;
 Quaternion rc_target_orientation;
+uint8_t    rc_telemetry_acc_mode = 0;
 
 //ориентация
 Quaternion targetQuaternion;
@@ -792,10 +793,19 @@ void taskTelemetry()
         frsky_sport.telemetry_current = 23.4f + ((HAL_GetTick() % 3) * 0.3f);
         frsky_sport.telemetry_vbat = vbat;
         
-        ahrs_Mahony.Q.ToEuler(vEuler);        
+
+        switch(rc_telemetry_acc_mode)
+        {            
+            case  1: rc_target_orientation.ToEuler(vEuler); break;
+            case  2: targetQuaternion.ToEuler(vEuler); break;
+            case  0:
+            default: ahrs_Mahony.Q.ToEuler(vEuler); break;
+        }
+        
         frsky_sport.telemetry_acc_x = vEuler.X * RAD_TO_GRAD;
         frsky_sport.telemetry_acc_y = vEuler.Y * RAD_TO_GRAD;
         frsky_sport.telemetry_acc_z = vEuler.Z * RAD_TO_GRAD;
+
         
         frsky_sport.telemetry_alt = 18400 * (1 + 0.003665 * 20) * log10f(presure_home / presure_mBar);
         
