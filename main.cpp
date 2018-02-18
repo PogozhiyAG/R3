@@ -135,13 +135,15 @@ void taskInitAHRS();
 FrskySport frsky_sport;
 FrskySbus  frsky_sbus;
 bool       new_rc_command = false;
+float      Throttle = 0.0f;
 float      rc_axis_x;
 float      rc_axis_y;
 float      rc_axis_z;
+uint8_t    rc_telemetry_acc_mode = 0;
 Vector3D   rc_axis_pitch_roll;
 float      rc_angle;
 Quaternion rc_target_orientation;
-uint8_t    rc_telemetry_acc_mode = 0;
+
 
 //ориентация
 Quaternion targetQuaternion;
@@ -187,8 +189,7 @@ float mixMotor[4][4] =
 //сигналы моторов
 float motors[4] = {0,0,0,0};
 
-//газ				 
-float Throttle = 0.0f;
+
 
 
 
@@ -601,19 +602,6 @@ void taskAHRS()
 void taskStabilization(float deltat)
 {       
     timings[1].start(get_time());
-
-    if(frsky_sbus.is_data_done(get_time())) //DEBUG
-    {
-        //читаем приемник
-        Throttle = frsky_sbus.get_channel_throttle();
-        rc_axis_x = frsky_sbus.get_channel_axis_x(0.02f);
-        rc_axis_y = frsky_sbus.get_channel_axis_y(0.008f);
-        rc_axis_z = frsky_sbus.get_channel_axis_z(0.008f);
-    }
-    else
-    {
-        rc_axis_x  = rc_axis_y = rc_axis_z = 0.0f; 
-    }
     
     
     //интегрируем угол курса
@@ -726,48 +714,113 @@ void taskStabilization(float deltat)
 
 
 
-//DEBUG
+
+
+
 void taskControl()
 {
     static uint32_t time = 0;
     
+    int8_t     attempts = 2;
+    uint32_t   fc   = 0;
+    
+    bool       done = false;
+    bool       is_data_done = false;
+    
+    float      temp_Throttle;
+    float      temp_rc_axis_x;
+    float      temp_rc_axis_y;
+    float      temp_rc_axis_z;
+    uint8_t    temp_rc_telemetry_acc_mode;
+    
+    float      temp_p;
+    float      temp_i;
+    float      temp_maxI;
+    float      temp_d;
+    
+    bool       temp_set_home_presure;
+    
+    
     if(get_time() - time >= 10000)
     {
         time = get_time();
-        
-        if(frsky_sbus.is_data_done(time))
-        {            
-        
-            //пиды
-            float p     = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
-            float i     = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 3.00f); 
-            float _maxI = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.07f); 
-            float d     = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
+    
+        do
+        {        
+            if(attempts-- <= 0) break;
+            fc = frsky_sbus.frames_count;
             
+            if(is_data_done = frsky_sbus.is_data_done(get_time()))
+            {            
+                temp_Throttle  = frsky_sbus.get_channel_throttle();
+               
+                temp_rc_axis_x = frsky_sbus.get_channel_axis_x(0.02f);
+                temp_rc_axis_y = frsky_sbus.get_channel_axis_y(0.008f);
+                temp_rc_axis_z = frsky_sbus.get_channel_axis_z(0.008f);
+                
+                temp_p         = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
+                temp_i         = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 3.00f); 
+                temp_maxI      = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.07f); 
+                temp_d         = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
+                
+                temp_set_home_presure = (frsky_sbus.channels[11] == 0x0713);
+                
+                switch(frsky_sbus.channels[10])
+                {   
+                    case 0x03E0: temp_rc_telemetry_acc_mode = 1; break;
+                    case 0x0713: temp_rc_telemetry_acc_mode = 2; break;
+                    case 0x00AC:
+                    default    : temp_rc_telemetry_acc_mode = 0; 
+                }
+            }            
             
-            //pidZ.kP = (pidX.kP = pidY.kP = p) * 3.0f;
-            
-            pidX.kP = pidY.kP = pidZ.kP = p ;
-            pidX.kI = pidY.kI = pidZ.kI = i;
-            pidX.maxI = pidY.maxI = pidZ.maxI = _maxI;            
-            pidX.kD = pidY.kD = pidZ.kD = d;
-            
-            //DEBUG
-            //установка домашнего давления
-            if (frsky_sbus.channels[11] == 0x0713 )
-            {
-                presure_home = presure_mBar;
-            }
+            done = (fc == frsky_sbus.frames_count);
         }
-        else
+        //читаем из одного кадра
+        while(!done);
+        
+        
+        if(done)
         {
-            pidX.kP = pidY.kP = pidZ.kP = 0.40f ;
-            pidX.kI = pidY.kI = pidZ.kI = 0.05f;
-            pidX.maxI = pidY.maxI = pidZ.maxI = 0.035f;            
-            pidX.kD = pidY.kD = pidZ.kD = 0.20f;
+            if(is_data_done)
+            {
+                Throttle  = temp_Throttle;
+            
+                rc_axis_x = temp_rc_axis_x;
+                rc_axis_y = temp_rc_axis_y;
+                rc_axis_z = temp_rc_axis_z;
+                
+                pidX.kP   = pidY.kP   = pidZ.kP   = temp_p;
+                pidX.kI   = pidY.kI   = pidZ.kI   = temp_i;
+                pidX.maxI = pidY.maxI = pidZ.maxI = temp_maxI;            
+                pidX.kD   = pidY.kD   = pidZ.kD   = temp_d; 
+
+                if (temp_set_home_presure)
+                {
+                    presure_home = presure_mBar;
+                }
+                
+                rc_telemetry_acc_mode = temp_rc_telemetry_acc_mode;
+                    
+            }
+            //failsafe
+            else
+            {
+                rc_axis_x = 0.0f;
+                rc_axis_y = 0.0f;
+                rc_axis_z = 0.0f;
+                
+                pidX.kP   = pidY.kP   = pidZ.kP   = 0.40f;
+                pidX.kI   = pidY.kI   = pidZ.kI   = 0.05f;
+                pidX.maxI = pidY.maxI = pidZ.maxI = 0.035f;            
+                pidX.kD   = pidY.kD   = pidZ.kD   = 0.20f;
+            }      
         }
+        
     }
 }
+
+
 
 
 
