@@ -33,6 +33,7 @@ TODO:
 
 #include "utils.cpp"
 #include "ahrs_Mahony.cpp"
+#include "ahrs_Madgwick.cpp"
 #include "telemetry.cpp"
 #include "gps.cpp"
 #include "pid.cpp"
@@ -200,7 +201,8 @@ LIS3MDL         magnetometer    (&hi2c,   0.30f);
 I2CSensor3Axis  barometer       (&hi2c_2, 0xB9, 0x27);
 
 //фильтр ориентации
-AHRSMahony ahrs_Mahony(1, 0);
+//AHRSMahony ahrs_Mahony(1, 0);
+AHRSMadgwick ahrs_Madgwick(0.06, 0);
 
 //кодировщик телеметрии
 TelemetryCoder telemetryCoder(1000);
@@ -358,8 +360,8 @@ void taskInitAHRS()
         {
             time = get_time();
             
-            ahrs_Mahony.twoKp = 20.0f;
-            ahrs_Mahony.twoKi = 0.0f;
+            ahrs_Madgwick.beta = 5.0f;
+            ahrs_Madgwick.zeta = 0.0f;
             
             ahrs_state = 1;
             break;
@@ -368,8 +370,9 @@ void taskInitAHRS()
         {
             if(get_time() - time >= 10000000)
             {
-                ahrs_Mahony.twoKp = 0.6f;
-                ahrs_Mahony.twoKi = 0.006f;
+                ahrs_Madgwick.beta = 0.06f;
+                ahrs_Madgwick.zeta = 0.003f;
+                
                 ahrs_state = 2;
             }
             break;
@@ -547,17 +550,16 @@ void taskAHRS()
                 timings[0].stop(get_time());
                 
                 //используем акселерометр только в более-менее спокойном состоянии
-                acceleration = accelerometer.result.GetLength();
-                bool useAcc = (acceleration > 1.0f - accelerationNormalRange) && (acceleration < 1.0f + accelerationNormalRange);
+                //acceleration = accelerometer.result.GetLength();
+                //bool useAcc = (acceleration > 1.0f - accelerationNormalRange) && (acceleration < 1.0f + accelerationNormalRange);
                 
                 //расчет текущей ориентации
-                ahrs_Mahony.Update
+                ahrs_Madgwick.Update
                 (
                     gyroscope.result.X, gyroscope.result.Y, gyroscope.result.Z,
                     accelerometer.result.X, accelerometer.result.Y, accelerometer.result.Z,                    
                     magnetometer.result.X, magnetometer.result.Y, magnetometer.result.Z,
-                    deltat * 0.000001f,
-                    useAcc
+                    deltat * 0.000001f
                 );
                 
                 
@@ -625,7 +627,7 @@ void taskStabilization(float deltat)
     
     
     //кватернион поворота из текущей ориентации в целевую
-    targetQuaternion = ahrs_Mahony.Q.Conjugated() * rc_target_orientation;
+    targetQuaternion = ahrs_Madgwick.Q.Conjugated() * rc_target_orientation;
     
     //выбираем кратчайшее направление
     if(targetQuaternion.W < 0)
@@ -865,7 +867,7 @@ void taskTelemetry()
             case  1: rc_target_orientation.ToEuler(vEuler); break;
             case  2: targetQuaternion.ToEuler(vEuler); break;
             case  0:
-            default: ahrs_Mahony.Q.ToEuler(vEuler); break;
+            default: ahrs_Madgwick.Q.ToEuler(vEuler); break;
         }
         
         frsky_sport.telemetry_acc_x = vEuler.X * RAD_TO_GRAD;
@@ -912,9 +914,9 @@ void taskTelemetry()
         telemetryCoder.addMessage(&presure_mBar, sizeof(float), 0x0500);
         
         //DEBUG
-        telemetryCoder.addMessage(&ahrs_Mahony.Q, sizeof(Quaternion), 0x0602);        
-        telemetryCoder.addMessage(&ahrs_Mahony.twoKp, sizeof(float), 0x0603);
-        telemetryCoder.addMessage(&ahrs_Mahony.twoKi, sizeof(float), 0x0604);
+        telemetryCoder.addMessage(&ahrs_Madgwick.Q, sizeof(Quaternion), 0x0602);        
+        telemetryCoder.addMessage(&ahrs_Madgwick.beta, sizeof(float), 0x0603);
+        telemetryCoder.addMessage(&ahrs_Madgwick.zeta, sizeof(float), 0x0604);
         
         telemetry_packet_length = telemetryCoder.getLength();
         
