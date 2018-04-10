@@ -160,14 +160,14 @@ Vector3D zAxis(0, 0, 1.0f);
 //PID коэффициенты
  float
         maxValue = 0.30f,
-		kP = 0.30f, maxP = 0.30f,
-		kI = 1.00f, maxI = 0.04f,
-		kD = 0.05f, maxD = 0.10f;
+		kP = 0.40f, maxP = 0.30f,
+		kI = 0.05f, maxI = 0.035f,
+		kD = 0.20f, maxD = 0.10f;
 
 //PIDы по осям
 PID pidX(maxValue, kP, maxP, kI, maxI, kD, maxD);
 PID pidY(maxValue, kP, maxP, kI, maxI, kD, maxD);
-PID pidZ(maxValue * 0.3f, kP, maxP * 0.3f, kI, maxI, kD, maxD); 
+PID pidZ(maxValue, kP, maxP, kI, maxI, kD, maxD); 
 
 
 //Мин и макс сигналы моторов
@@ -196,7 +196,7 @@ float motors[4] = {0,0,0,0};
 //сенсоры
 L3G4200D        gyroscope       (&hi2c_2, 1.00f);
 LIS331DLH       accelerometer   (&hi2c_2, 0.30f);
-LIS3MDL         magnetometer    (&hi2c, 0.30f);
+LIS3MDL         magnetometer    (&hi2c,   0.30f);
 I2CSensor3Axis  barometer       (&hi2c_2, 0xB9, 0x27);
 
 //фильтр ориентации
@@ -229,7 +229,7 @@ float presure_mBar;
 float presure_home;
 //DEBUG
 float acceleration;
-float accelerationNormalRange = 0.2;
+float accelerationNormalRange = 0.6;
 
 
 
@@ -366,10 +366,10 @@ void taskInitAHRS()
         }
         case 1:
         {
-            if(get_time() - time >= 5000000)
+            if(get_time() - time >= 10000000)
             {
                 ahrs_Mahony.twoKp = 0.6f;
-                ahrs_Mahony.twoKi = 0.003f;
+                ahrs_Mahony.twoKi = 0.006f;
                 ahrs_state = 2;
             }
             break;
@@ -738,6 +738,9 @@ void taskControl()
     float      temp_maxI;
     float      temp_d;
     
+    float      temp_twoKp;
+    float      temp_twoKi;
+    
     bool       temp_set_home_presure;
     
     
@@ -758,10 +761,12 @@ void taskControl()
                 temp_rc_axis_y = frsky_sbus.get_channel_axis_y(0.008f);
                 temp_rc_axis_z = frsky_sbus.get_channel_axis_z(0.008f);
                 
-                temp_p         = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
-                temp_i         = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 3.00f); 
+                temp_p         = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.40f, 1.00f); 
+                //temp_twoKp     = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.20f, 1.50f); 
+                temp_i         = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.20f); 
                 temp_maxI      = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.07f); 
-                temp_d         = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
+                temp_d         = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.10f, 0.30f); 
+                //temp_twoKi     = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.003f, 0.030f); 
                 
                 temp_set_home_presure = (frsky_sbus.channels[11] == 0x0713);
                 
@@ -790,10 +795,17 @@ void taskControl()
                 rc_axis_y = temp_rc_axis_y;
                 rc_axis_z = temp_rc_axis_z;
                 
+                if(ahrs_state >= 2)
+                {
+                    //ahrs_Mahony.twoKp = temp_twoKp;
+                    //ahrs_Mahony.twoKi = temp_twoKi;
+                }
+                
+                
                 pidX.kP   = pidY.kP   = pidZ.kP   = temp_p;
                 pidX.kI   = pidY.kI   = pidZ.kI   = temp_i;
                 pidX.maxI = pidY.maxI = pidZ.maxI = temp_maxI;            
-                pidX.kD   = pidY.kD   = pidZ.kD   = temp_d; 
+                pidX.kD   = pidY.kD   = pidZ.kD   = temp_d;                
 
                 if (temp_set_home_presure)
                 {
@@ -808,12 +820,13 @@ void taskControl()
             {
                 rc_axis_x = 0.0f;
                 rc_axis_y = 0.0f;
-                rc_axis_z = 0.0f;
+                rc_axis_z = 0.0f;           
                 
-                pidX.kP   = pidY.kP   = pidZ.kP   = 0.40f;
-                pidX.kI   = pidY.kI   = pidZ.kI   = 0.05f;
-                pidX.maxI = pidY.maxI = pidZ.maxI = 0.035f;            
-                pidX.kD   = pidY.kD   = pidZ.kD   = 0.20f;
+                
+                pidX.kP   = pidY.kP   = pidZ.kP   = kP;
+                pidX.kI   = pidY.kI   = pidZ.kI   = kI;
+                pidX.maxI = pidY.maxI = pidZ.maxI = maxI;            
+                pidX.kD   = pidY.kD   = pidZ.kD   = kD;
             }      
         }
         
@@ -878,11 +891,20 @@ void taskTelemetry()
         telemetryCoder.addMessage(&vbat, sizeof(float), 0x0005);
         telemetryCoder.addMessage(&rc_target_orientation, sizeof(Quaternion), 0x0006);
         telemetryCoder.addMessage(&targetQuaternion, sizeof(Quaternion), 0x0007);        
+        
         telemetryCoder.addMessage(&pidX.kP, sizeof(float), 0x0008);
         telemetryCoder.addMessage(&pidX.kI, sizeof(float), 0x0009);
         telemetryCoder.addMessage(&pidX.kD, sizeof(float), 0x000A);
         telemetryCoder.addMessage(&pidX.maxI, sizeof(float), 0x000B);
-        telemetryCoder.addMessage(&ubx_nav_pvt, sizeof(UBX_NAV_PVT), 0x0101);
+        
+        telemetryCoder.addMessage(&pidX.P, sizeof(float) * 4, 0x0701);
+        telemetryCoder.addMessage(&pidY.P, sizeof(float) * 4, 0x0702);
+        telemetryCoder.addMessage(&pidZ.P, sizeof(float) * 4, 0x0703);
+        telemetryCoder.addMessage(&Throttle, sizeof(float), 0x0710);
+        telemetryCoder.addMessage(&motors[0], sizeof(float) * 4, 0x0720);
+        
+        
+        //telemetryCoder.addMessage(&ubx_nav_pvt, sizeof(UBX_NAV_PVT), 0x0101);
         
         telemetryCoder.addMessage(&gyroscope.axis[0], sizeof(int16_t) * 3, 0x0200);        
         telemetryCoder.addMessage(&accelerometer.axis[0], sizeof(int16_t) * 3, 0x0300);        
@@ -982,7 +1004,7 @@ void init_sensors()
 	//калибровка
 	//gyroscope.calibrate(500, 1, 10);
     Vector3D v; 
-    uint32_t times = 5000;
+    uint32_t times = 15000;
     for(int i = 0; i < times; i++)
     {
         ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
@@ -1002,23 +1024,29 @@ void init_sensors()
 	
 	
 	//акселерометр
+    //проверка i2c 
+    ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
+    
 	accelerometer.writeRegister(LIS331DLH_CTRL_REG_1, 0x3F, 10);
-	accelerometer.writeRegister(LIS331DLH_CTRL_REG_4, 0x80, 10); //+-2G
-	accelerometer.offset.Set(485.79f, -529.53f, 290.00f);	
-	accelerometer.scaleFactor[0].Set(0.000060f, 0.000001f, 0.000000f);
-	accelerometer.scaleFactor[1].Set(0.000001f, 0.000060f, 0.000000f);
-	accelerometer.scaleFactor[2].Set(0.000000f, 0.000000f, 0.000060f);
+	accelerometer.writeRegister(LIS331DLH_CTRL_REG_4, 0x90, 10); //+-4G
+	accelerometer.offset.Set(120.0f, -400.0f, 1826.299199f);	
+	accelerometer.scaleFactor[0].Set(0.000162f, 0.000001f, 0.000002f);
+	accelerometer.scaleFactor[1].Set(0.000001f, 0.000200f, 0.000002f);
+	accelerometer.scaleFactor[2].Set(0.000002f, 0.000002f, 0.000155f);
 	
 		
-	//магнетометр    
+	//магнетометр
+    //проверка i2c             
+    ensure_I2C(&hi2c, GPIOB, GPIO_PIN_8, GPIO_PIN_9, &i2c_stats[0]);    
+    
 	magnetometer.writeRegister(LIS3MDL_CTRL_REG1, 0x22, 10);
     magnetometer.writeRegister(LIS3MDL_CTRL_REG3, 0x00, 10);
     magnetometer.writeRegister(LIS3MDL_CTRL_REG4, 0x04, 10);
     magnetometer.writeRegister(LIS3MDL_CTRL_REG5, 0x40, 10);
-	magnetometer.offset.Set(-298.040395f, 576.143406f, -1795.183563);	
-	magnetometer.scaleFactor[0].Set(0.000361f, -0.000011f, -0.000030f);
-	magnetometer.scaleFactor[1].Set(-0.000011f, 0.000345f, -0.000012f);
-	magnetometer.scaleFactor[2].Set(-0.000030f, -0.000012f, 0.000318f);
+	magnetometer.offset.Set(-828.014683f, 1162.256930f, -3130.607663);	
+	magnetometer.scaleFactor[0].Set(0.000343f, -0.000021f, -0.000038f);
+	magnetometer.scaleFactor[1].Set(-0.000021f, 0.000334f, -0.000021f);
+	magnetometer.scaleFactor[2].Set(-0.000038f, -0.000021f, 0.000280f);
     
   
     

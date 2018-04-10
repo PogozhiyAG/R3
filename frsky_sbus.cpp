@@ -18,7 +18,7 @@
 #define FRSKY_CHANNEL_AXIS_Y         1
 #define FRSKY_CHANNEL_AXIS_Z         3
 
-#define FRSKY_SBUS_DATA_TIMOUT_US 20000 
+#define FRSKY_SBUS_DATA_TIMOUT_US 200000 
 
 class FrskySbus
 {
@@ -33,7 +33,10 @@ class FrskySbus
     int32_t fill;
     //время последнего кадра
     uint32_t last_frame_time;
-    uint32_t frames_count;
+    uint32_t volatile frames_count;
+    
+    uint32_t failsafe_count;
+    uint32_t frame_lost_count;
 	
 	FrskySbus()
 	{		
@@ -42,6 +45,8 @@ class FrskySbus
 		fill = 0;
         last_frame_time = 0;
         frames_count = 0;
+        failsafe_count = 0;
+        frame_lost_count = 0;
 	}
 	
 	
@@ -81,7 +86,11 @@ class FrskySbus
                     is_frame_lost         = flags & 0x04;
                     is_failsafe_activated = flags & 0x08;
                     
-                    
+                    //statistics
+                    if(is_frame_lost) 
+                        frame_lost_count++;
+                    if(is_failsafe_activated) 
+                        failsafe_count++;
                     
                     result = true;
                 }
@@ -93,7 +102,7 @@ class FrskySbus
 	
 	bool is_data_done(uint32_t time)
     {
-        return !is_frame_lost && !is_failsafe_activated && (time - last_frame_time < FRSKY_SBUS_DATA_TIMOUT_US) && (frames_count > 0);
+        return !is_failsafe_activated && (time - last_frame_time < FRSKY_SBUS_DATA_TIMOUT_US) && (frames_count > 0);
     }
 	
 	float get_channel_throttle()
