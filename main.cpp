@@ -161,9 +161,9 @@ Vector3D zAxis(0, 0, 1.0f);
 //PID коэффициенты
  float
         maxValue = 0.30f,
-		kP = 0.40f, maxP = 0.30f,
+		kP = 0.70f, maxP = 0.30f,
 		kI = 0.05f, maxI = 0.035f,
-		kD = 0.20f, maxD = 0.10f;
+		kD = 0.17f, maxD = 0.10f;
 
 //PIDы по осям
 PID pidX(maxValue, kP, maxP, kI, maxI, kD, maxD);
@@ -360,7 +360,7 @@ void taskInitAHRS()
         {
             time = get_time();
             
-            ahrs_Madgwick.beta = 5.0f;
+            ahrs_Madgwick.beta = 2.0f;
             ahrs_Madgwick.zeta = 0.0f;
             
             ahrs_state = 1;
@@ -368,7 +368,7 @@ void taskInitAHRS()
         }
         case 1:
         {
-            if(get_time() - time >= 10000000)
+            if(get_time() - time >= 2000000)
             {
                 ahrs_Madgwick.beta = 0.06f;
                 ahrs_Madgwick.zeta = 0.003f;
@@ -740,8 +740,8 @@ void taskControl()
     float      temp_maxI;
     float      temp_d;
     
-    float      temp_twoKp;
-    float      temp_twoKi;
+    float      temp_beta;
+    float      temp_zeta;
     
     bool       temp_set_home_presure;
     
@@ -763,12 +763,12 @@ void taskControl()
                 temp_rc_axis_y = frsky_sbus.get_channel_axis_y(0.008f);
                 temp_rc_axis_z = frsky_sbus.get_channel_axis_z(0.008f);
                 
-                temp_p         = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.40f, 1.00f); 
-                //temp_twoKp     = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.20f, 1.50f); 
+                //temp_p         = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.40f, 1.00f); 
+                temp_beta      = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.003f, 0.05f); 
                 temp_i         = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.20f); 
                 temp_maxI      = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.07f); 
-                temp_d         = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.10f, 0.30f); 
-                //temp_twoKi     = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.003f, 0.030f); 
+                //temp_d         = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.10f, 0.30f); 
+                temp_zeta      = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.000f, 0.01f); 
                 
                 temp_set_home_presure = (frsky_sbus.channels[11] == 0x0713);
                 
@@ -799,15 +799,15 @@ void taskControl()
                 
                 if(ahrs_state >= 2)
                 {
-                    //ahrs_Mahony.twoKp = temp_twoKp;
-                    //ahrs_Mahony.twoKi = temp_twoKi;
+                    ahrs_Madgwick.beta = temp_beta;
+                    ahrs_Madgwick.zeta = temp_zeta;
                 }
                 
                 
-                pidX.kP   = pidY.kP   = pidZ.kP   = temp_p;
+                //pidX.kP   = pidY.kP   = pidZ.kP   = temp_p;
                 pidX.kI   = pidY.kI   = pidZ.kI   = temp_i;
                 pidX.maxI = pidY.maxI = pidZ.maxI = temp_maxI;            
-                pidX.kD   = pidY.kD   = pidZ.kD   = temp_d;                
+                //pidX.kD   = pidY.kD   = pidZ.kD   = temp_d;                
 
                 if (temp_set_home_presure)
                 {
@@ -824,6 +824,8 @@ void taskControl()
                 rc_axis_y = 0.0f;
                 rc_axis_z = 0.0f;           
                 
+                ahrs_Madgwick.beta = 0.06f;
+                ahrs_Madgwick.zeta = 0.003;
                 
                 pidX.kP   = pidY.kP   = pidZ.kP   = kP;
                 pidX.kI   = pidY.kI   = pidZ.kI   = kI;
