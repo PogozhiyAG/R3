@@ -160,10 +160,10 @@ Vector3D zAxis(0, 0, 1.0f);
 
 //PID коэффициенты
  float
-        maxValue = 0.30f,
-		kP = 0.70f, maxP = 0.30f,
-		kI = 0.05f, maxI = 0.035f,
-		kD = 0.17f, maxD = 0.10f;
+    maxValue = 0.30f,
+    kP = 0.70f, maxP = 0.30f,
+    kI = 0.05f, maxI = 0.035f,
+    kD = 0.17f, maxD = 0.10f;
 
 //PIDы по осям
 PID pidX(maxValue, kP, maxP, kI, maxI, kD, maxD);
@@ -195,9 +195,9 @@ float motors[4] = {0,0,0,0};
 
 
 //сенсоры
-L3G4200D        gyroscope       (&hi2c_2, 1.00f);
-LIS331DLH       accelerometer   (&hi2c_2, 0.30f);
-LIS3MDL         magnetometer    (&hi2c,   0.30f);
+L3G4200D        gyroscope       (&hi2c_2, 0.18f);
+LIS331DLH       accelerometer   (&hi2c_2, 0.02f);
+LIS3MDL         magnetometer    (&hi2c,   0.02f);
 I2CSensor3Axis  barometer       (&hi2c_2, 0xB9, 0x27);
 
 //фильтр ориентации
@@ -368,9 +368,9 @@ void taskInitAHRS()
         }
         case 1:
         {
-            if(get_time() - time >= 2000000)
+            if(get_time() - time >= 1000000)
             {
-                ahrs_Madgwick.beta = 0.06f;
+                ahrs_Madgwick.beta = 0.02f;
                 ahrs_Madgwick.zeta = 0.003f;
                 
                 ahrs_state = 2;
@@ -416,7 +416,10 @@ void taskAHRS()
             {
                 step++;
             }
-			
+            else
+            {
+                reinit_I2C(&hi2c_2);
+            }
 			break;
         }
 		//ждем гироскоп; 
@@ -451,6 +454,10 @@ void taskAHRS()
                 //обработка гироскопа
                 gyroscope.processResult();
                 step++;
+            }
+            else
+            {
+                reinit_I2C(&hi2c_2);
             }
         }
         //обработка акселерометра;
@@ -494,6 +501,10 @@ void taskAHRS()
                 //обработка акселерометра
                 accelerometer.processResult();
                 step1++;
+            }
+            else
+            {
+                reinit_I2C(&hi2c);
             }
             break;
         }
@@ -765,8 +776,8 @@ void taskControl()
                 
                 //temp_p         = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.40f, 1.00f); 
                 temp_beta      = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.003f, 0.05f); 
-                temp_i         = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.20f); 
-                temp_maxI      = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.07f); 
+                temp_i         = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
+                temp_maxI      = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.04f); 
                 //temp_d         = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.10f, 0.30f); 
                 temp_zeta      = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.000f, 0.01f); 
                 
@@ -824,7 +835,7 @@ void taskControl()
                 rc_axis_y = 0.0f;
                 rc_axis_z = 0.0f;           
                 
-                ahrs_Madgwick.beta = 0.06f;
+                ahrs_Madgwick.beta = 0.02f;
                 ahrs_Madgwick.zeta = 0.003;
                 
                 pidX.kP   = pidY.kP   = pidZ.kP   = kP;
@@ -996,7 +1007,7 @@ void delay_us(uint32_t us)
 void init_sensors()
 {
     //задержка, чтобы успеть убрать руки
-    delay_us(3000000);
+    delay_us(2000000);
     
     //проверка i2c 
     ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
@@ -1008,7 +1019,7 @@ void init_sensors()
 	//калибровка
 	//gyroscope.calibrate(500, 1, 10);
     Vector3D v; 
-    uint32_t times = 15000;
+    uint32_t times = 5000;
     for(int i = 0; i < times; i++)
     {
         ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
