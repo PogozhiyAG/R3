@@ -33,6 +33,7 @@ TODO:
 
 #include "utils.cpp"
 #include "ahrs_Mahony.cpp"
+#include "ahrs_Madgwick.cpp"
 #include "telemetry.cpp"
 #include "gps.cpp"
 #include "pid.cpp"
@@ -135,12 +136,15 @@ void taskInitAHRS();
 FrskySport frsky_sport;
 FrskySbus  frsky_sbus;
 bool       new_rc_command = false;
+float      Throttle = 0.0f;
 float      rc_axis_x;
 float      rc_axis_y;
 float      rc_axis_z;
+uint8_t    rc_telemetry_acc_mode = 0;
 Vector3D   rc_axis_pitch_roll;
 float      rc_angle;
 Quaternion rc_target_orientation;
+
 
 //ориентация
 Quaternion targetQuaternion;
@@ -156,15 +160,15 @@ Vector3D zAxis(0, 0, 1.0f);
 
 //PID коэффициенты
  float
-        maxValue = 0.30f,
-		kP = 0.30f, maxP = 0.30f,
-		kI = 1.00f, maxI = 0.04f,
-		kD = 0.05f, maxD = 0.10f;
+    maxValue = 0.30f,
+    kP = 0.70f, maxP = 0.30f,
+    kI = 0.05f, maxI = 0.035f,
+    kD = 0.17f, maxD = 0.10f;
 
 //PIDы по осям
 PID pidX(maxValue, kP, maxP, kI, maxI, kD, maxD);
 PID pidY(maxValue, kP, maxP, kI, maxI, kD, maxD);
-PID pidZ(maxValue * 0.3f, kP, maxP * 0.3f, kI, maxI, kD, maxD); 
+PID pidZ(maxValue, kP, maxP, kI, maxI, kD, maxD); 
 
 
 //Мин и макс сигналы моторов
@@ -186,19 +190,19 @@ float mixMotor[4][4] =
 //сигналы моторов
 float motors[4] = {0,0,0,0};
 
-//газ				 
-float Throttle = 0.0f;
+
 
 
 
 //сенсоры
-L3G4200D        gyroscope       (&hi2c_2, 1.00f);
-LIS331DLH       accelerometer   (&hi2c_2, 0.30f);
-LIS3MDL         magnetometer    (&hi2c, 0.30f);
+L3G4200D        gyroscope       (&hi2c_2, 0.18f);
+LIS331DLH       accelerometer   (&hi2c_2, 0.018f);
+LIS3MDL         magnetometer    (&hi2c,   0.018f);
 I2CSensor3Axis  barometer       (&hi2c_2, 0xB9, 0x27);
 
 //фильтр ориентации
-AHRSMahony ahrs_Mahony(1, 0);
+//AHRSMahony ahrs_Mahony(1, 0);
+AHRSMadgwick ahrs_Madgwick(0.06, 0);
 
 //кодировщик телеметрии
 TelemetryCoder telemetryCoder(1000);
@@ -227,7 +231,7 @@ float presure_mBar;
 float presure_home;
 //DEBUG
 float acceleration;
-float accelerationNormalRange = 0.2;
+float accelerationNormalRange = 0.6;
 
 
 
@@ -308,16 +312,13 @@ int main()
     HAL_TIM_PWM_Start(&htim_motor, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim_motor, TIM_CHANNEL_4);
     
-    
-    
-    
+        
     //стоп моторы
     htim_motor.Instance->CCR1 = minMotors;
     htim_motor.Instance->CCR2 = minMotors;
     htim_motor.Instance->CCR3 = minMotors;
     htim_motor.Instance->CCR4 = minMotors;            
-    
-    
+        
     
     //запуск uart'ов    
 	sport_t(1);
@@ -359,18 +360,19 @@ void taskInitAHRS()
         {
             time = get_time();
             
-            ahrs_Mahony.twoKp = 20.0f;
-            ahrs_Mahony.twoKi = 0.0f;
+            ahrs_Madgwick.beta = 2.0f;
+            ahrs_Madgwick.zeta = 0.0f;
             
             ahrs_state = 1;
             break;
         }
         case 1:
         {
-            if(get_time() - time >= 5000000)
+            if(get_time() - time >= 1000000)
             {
-                ahrs_Mahony.twoKp = 0.6f;
-                ahrs_Mahony.twoKi = 0.003f;
+                ahrs_Madgwick.beta = 0.003f;
+                ahrs_Madgwick.zeta = 0.00015f;
+                
                 ahrs_state = 2;
             }
             break;
@@ -414,7 +416,10 @@ void taskAHRS()
             {
                 step++;
             }
-			
+            else
+            {
+                reinit_I2C(&hi2c_2);
+            }
 			break;
         }
 		//ждем гироскоп; 
@@ -449,6 +454,10 @@ void taskAHRS()
                 //обработка гироскопа
                 gyroscope.processResult();
                 step++;
+            }
+            else
+            {
+                reinit_I2C(&hi2c_2);
             }
         }
         //обработка акселерометра;
@@ -492,6 +501,10 @@ void taskAHRS()
                 //обработка акселерометра
                 accelerometer.processResult();
                 step1++;
+            }
+            else
+            {
+                reinit_I2C(&hi2c);
             }
             break;
         }
@@ -548,17 +561,16 @@ void taskAHRS()
                 timings[0].stop(get_time());
                 
                 //используем акселерометр только в более-менее спокойном состоянии
-                acceleration = accelerometer.result.GetLength();
-                bool useAcc = (acceleration > 1.0f - accelerationNormalRange) && (acceleration < 1.0f + accelerationNormalRange);
+                //acceleration = accelerometer.result.GetLength();
+                //bool useAcc = (acceleration > 1.0f - accelerationNormalRange) && (acceleration < 1.0f + accelerationNormalRange);
                 
                 //расчет текущей ориентации
-                ahrs_Mahony.Update
+                ahrs_Madgwick.Update
                 (
                     gyroscope.result.X, gyroscope.result.Y, gyroscope.result.Z,
                     accelerometer.result.X, accelerometer.result.Y, accelerometer.result.Z,                    
                     magnetometer.result.X, magnetometer.result.Y, magnetometer.result.Z,
-                    deltat * 0.000001f,
-                    useAcc
+                    deltat * 0.000001f
                 );
                 
                 
@@ -603,19 +615,6 @@ void taskAHRS()
 void taskStabilization(float deltat)
 {       
     timings[1].start(get_time());
-
-    if(frsky_sbus.is_data_done(get_time())) //DEBUG
-    {
-        //читаем приемник
-        Throttle = frsky_sbus.get_channel_throttle();
-        rc_axis_x = frsky_sbus.get_channel_axis_x(0.02f);
-        rc_axis_y = frsky_sbus.get_channel_axis_y(0.008f);
-        rc_axis_z = frsky_sbus.get_channel_axis_z(0.008f);
-    }
-    else
-    {
-        rc_axis_x  = rc_axis_y = rc_axis_z = 0.0f; 
-    }
     
     
     //интегрируем угол курса
@@ -639,7 +638,7 @@ void taskStabilization(float deltat)
     
     
     //кватернион поворота из текущей ориентации в целевую
-    targetQuaternion = ahrs_Mahony.Q.Conjugated() * rc_target_orientation;
+    targetQuaternion = ahrs_Madgwick.Q.Conjugated() * rc_target_orientation;
     
     //выбираем кратчайшее направление
     if(targetQuaternion.W < 0)
@@ -728,47 +727,131 @@ void taskStabilization(float deltat)
 
 
 
-//DEBUG
+
+
+
 void taskControl()
 {
     static uint32_t time = 0;
     
+    int8_t     attempts = 2;
+    uint32_t   fc   = 0;
+    
+    bool       done = false;
+    bool       is_data_done = false;
+    
+    float      temp_Throttle;
+    float      temp_rc_axis_x;
+    float      temp_rc_axis_y;
+    float      temp_rc_axis_z;
+    uint8_t    temp_rc_telemetry_acc_mode;
+    
+    float      temp_p;
+    float      temp_i;
+    float      temp_maxI;
+    float      temp_d;
+    
+    float      temp_beta;
+    float      temp_zeta;
+    
+    bool       temp_set_home_presure;
+    
+    
     if(get_time() - time >= 10000)
     {
         time = get_time();
-        
-        if(frsky_sbus.is_data_done(time))
-        {
-            if(ahrs_state == 2)
-            {
-           
-                //ahrs_Mahony.twoKp = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00000f, 2.000f); 
-                //ahrs_Mahony.twoKi = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00000f, 0.200f); 
+    
+        do
+        {        
+            if(attempts-- <= 0) break;
+            fc = frsky_sbus.frames_count;
+            
+            if(is_data_done = frsky_sbus.is_data_done(get_time()))
+            {            
+                temp_Throttle  = frsky_sbus.get_channel_throttle();
                
-            }
-        
-            //пиды
-            float p     = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.50f); 
-            float i     = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 3.00f); 
-            float _maxI = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.07f); 
-            float d     = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.50f); 
+                temp_rc_axis_x = frsky_sbus.get_channel_axis_x(0.02f);
+                temp_rc_axis_y = frsky_sbus.get_channel_axis_y(0.008f);
+                temp_rc_axis_z = frsky_sbus.get_channel_axis_z(0.008f);
+                
+                temp_p         = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.70f, 1.00f); 
+                //temp_beta      = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.003f, 0.05f); 
+                temp_i         = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
+                temp_maxI      = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.04f); 
+                temp_d         = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.17f, 0.30f); 
+                //temp_zeta      = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.000f, 0.01f); 
+                
+                temp_set_home_presure = (frsky_sbus.channels[11] == 0x0713);
+                
+                switch(frsky_sbus.channels[10])
+                {   
+                    case 0x03E0: temp_rc_telemetry_acc_mode = 1; break;
+                    case 0x0713: temp_rc_telemetry_acc_mode = 2; break;
+                    case 0x00AC:
+                    default    : temp_rc_telemetry_acc_mode = 0; 
+                }
+            }            
             
-            
-            //pidZ.kP = (pidX.kP = pidY.kP = p) * 3.0f;
-            
-            pidX.kP = pidY.kP = pidZ.kP = p ;
-            pidX.kI = pidY.kI = pidZ.kI = i;
-            pidX.maxI = pidY.maxI = pidZ.maxI = _maxI;            
-            pidX.kD = pidY.kD = pidZ.kD = d;
-            
-            //установка домашнего давления
-            if (frsky_sbus.channels[11] == 0x0713 )
-            {
-                presure_home = presure_mBar;
-            }
+            done = (fc == frsky_sbus.frames_count);
         }
+        //читаем из одного кадра
+        while(!done);
+        
+        
+        if(done)
+        {
+            if(is_data_done)
+            {
+                Throttle  = temp_Throttle;
+            
+                rc_axis_x = temp_rc_axis_x;
+                rc_axis_y = temp_rc_axis_y;
+                rc_axis_z = temp_rc_axis_z;
+                
+                if(ahrs_state >= 2)
+                {
+                    //ahrs_Madgwick.beta = temp_beta;
+                    //ahrs_Madgwick.zeta = temp_zeta;
+                }
+                
+                
+                pidX.kP   = pidY.kP   = pidZ.kP   = temp_p;
+                pidX.kI   = pidY.kI   = pidZ.kI   = temp_i;
+                pidX.maxI = pidY.maxI = pidZ.maxI = temp_maxI;            
+                pidX.kD   = pidY.kD   = pidZ.kD   = temp_d;                
+
+                if (temp_set_home_presure)
+                {
+                    presure_home = presure_mBar;
+                }
+                
+                rc_telemetry_acc_mode = temp_rc_telemetry_acc_mode;
+                    
+            }
+            //failsafe
+            else
+            {
+                rc_axis_x = 0.0f;
+                rc_axis_y = 0.0f;
+                rc_axis_z = 0.0f;           
+                
+                ahrs_Madgwick.beta = 0.003f;
+                ahrs_Madgwick.zeta = 0.00015;
+                
+                pidX.kP   = pidY.kP   = pidZ.kP   = kP;
+                pidX.kI   = pidY.kI   = pidZ.kI   = kI;
+                pidX.maxI = pidY.maxI = pidZ.maxI = maxI;            
+                pidX.kD   = pidY.kD   = pidZ.kD   = kD;
+            }      
+        }
+        
     }
 }
+
+
+
+
+
 
 
 
@@ -791,10 +874,19 @@ void taskTelemetry()
         frsky_sport.telemetry_current = 23.4f + ((HAL_GetTick() % 3) * 0.3f);
         frsky_sport.telemetry_vbat = vbat;
         
-        ahrs_Mahony.Q.ToEuler(vEuler);        
+
+        switch(rc_telemetry_acc_mode)
+        {            
+            case  1: rc_target_orientation.ToEuler(vEuler); break;
+            case  2: targetQuaternion.ToEuler(vEuler); break;
+            case  0:
+            default: ahrs_Madgwick.Q.ToEuler(vEuler); break;
+        }
+        
         frsky_sport.telemetry_acc_x = vEuler.X * RAD_TO_GRAD;
         frsky_sport.telemetry_acc_y = vEuler.Y * RAD_TO_GRAD;
         frsky_sport.telemetry_acc_z = vEuler.Z * RAD_TO_GRAD;
+
         
         frsky_sport.telemetry_alt = 18400 * (1 + 0.003665 * 20) * log10f(presure_home / presure_mBar);
         
@@ -814,11 +906,20 @@ void taskTelemetry()
         telemetryCoder.addMessage(&vbat, sizeof(float), 0x0005);
         telemetryCoder.addMessage(&rc_target_orientation, sizeof(Quaternion), 0x0006);
         telemetryCoder.addMessage(&targetQuaternion, sizeof(Quaternion), 0x0007);        
+        
         telemetryCoder.addMessage(&pidX.kP, sizeof(float), 0x0008);
         telemetryCoder.addMessage(&pidX.kI, sizeof(float), 0x0009);
         telemetryCoder.addMessage(&pidX.kD, sizeof(float), 0x000A);
         telemetryCoder.addMessage(&pidX.maxI, sizeof(float), 0x000B);
-        telemetryCoder.addMessage(&ubx_nav_pvt, sizeof(UBX_NAV_PVT), 0x0101);
+        
+        telemetryCoder.addMessage(&pidX.P, sizeof(float) * 4, 0x0701);
+        telemetryCoder.addMessage(&pidY.P, sizeof(float) * 4, 0x0702);
+        telemetryCoder.addMessage(&pidZ.P, sizeof(float) * 4, 0x0703);
+        telemetryCoder.addMessage(&Throttle, sizeof(float), 0x0710);
+        telemetryCoder.addMessage(&motors[0], sizeof(float) * 4, 0x0720);
+        
+        
+        //telemetryCoder.addMessage(&ubx_nav_pvt, sizeof(UBX_NAV_PVT), 0x0101);
         
         telemetryCoder.addMessage(&gyroscope.axis[0], sizeof(int16_t) * 3, 0x0200);        
         telemetryCoder.addMessage(&accelerometer.axis[0], sizeof(int16_t) * 3, 0x0300);        
@@ -826,9 +927,9 @@ void taskTelemetry()
         telemetryCoder.addMessage(&presure_mBar, sizeof(float), 0x0500);
         
         //DEBUG
-        telemetryCoder.addMessage(&ahrs_Mahony.Q, sizeof(Quaternion), 0x0602);        
-        telemetryCoder.addMessage(&ahrs_Mahony.twoKp, sizeof(float), 0x0603);
-        telemetryCoder.addMessage(&ahrs_Mahony.twoKi, sizeof(float), 0x0604);
+        telemetryCoder.addMessage(&ahrs_Madgwick.Q, sizeof(Quaternion), 0x0602);        
+        telemetryCoder.addMessage(&ahrs_Madgwick.beta, sizeof(float), 0x0603);
+        telemetryCoder.addMessage(&ahrs_Madgwick.zeta, sizeof(float), 0x0604);
         
         telemetry_packet_length = telemetryCoder.getLength();
         
@@ -906,7 +1007,7 @@ void delay_us(uint32_t us)
 void init_sensors()
 {
     //задержка, чтобы успеть убрать руки
-    delay_us(3000000);
+    delay_us(2000000);
     
     //проверка i2c 
     ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
@@ -938,23 +1039,29 @@ void init_sensors()
 	
 	
 	//акселерометр
+    //проверка i2c 
+    ensure_I2C(&hi2c_2, GPIOB, GPIO_PIN_10, GPIO_PIN_3, &i2c_stats[1]);
+    
 	accelerometer.writeRegister(LIS331DLH_CTRL_REG_1, 0x3F, 10);
-	accelerometer.writeRegister(LIS331DLH_CTRL_REG_4, 0x80, 10); //+-2G
-	accelerometer.offset.Set(485.79f, -529.53f, 290.00f);	
-	accelerometer.scaleFactor[0].Set(0.000060f, 0.000001f, 0.000000f);
-	accelerometer.scaleFactor[1].Set(0.000001f, 0.000060f, 0.000000f);
-	accelerometer.scaleFactor[2].Set(0.000000f, 0.000000f, 0.000060f);
+	accelerometer.writeRegister(LIS331DLH_CTRL_REG_4, 0x90, 10); //+-4G
+	accelerometer.offset.Set(120.0f, -400.0f, 1826.299199f);	
+	accelerometer.scaleFactor[0].Set(0.000162f, 0.000001f, 0.000002f);
+	accelerometer.scaleFactor[1].Set(0.000001f, 0.000200f, 0.000002f);
+	accelerometer.scaleFactor[2].Set(0.000002f, 0.000002f, 0.000155f);
 	
 		
-	//магнетометр    
+	//магнетометр
+    //проверка i2c             
+    ensure_I2C(&hi2c, GPIOB, GPIO_PIN_8, GPIO_PIN_9, &i2c_stats[0]);    
+    
 	magnetometer.writeRegister(LIS3MDL_CTRL_REG1, 0x22, 10);
     magnetometer.writeRegister(LIS3MDL_CTRL_REG3, 0x00, 10);
     magnetometer.writeRegister(LIS3MDL_CTRL_REG4, 0x04, 10);
     magnetometer.writeRegister(LIS3MDL_CTRL_REG5, 0x40, 10);
-	magnetometer.offset.Set(-298.040395f, 576.143406f, -1795.183563);	
-	magnetometer.scaleFactor[0].Set(0.000361f, -0.000011f, -0.000030f);
-	magnetometer.scaleFactor[1].Set(-0.000011f, 0.000345f, -0.000012f);
-	magnetometer.scaleFactor[2].Set(-0.000030f, -0.000012f, 0.000318f);
+	magnetometer.offset.Set(-909.744878f, 1187.661095f, -902.216462f);	
+	magnetometer.scaleFactor[0].Set(0.000416f, -0.000003f, -0.000018f);
+	magnetometer.scaleFactor[1].Set(-0.000003f, 0.000435f, -0.000001f);
+	magnetometer.scaleFactor[2].Set(-0.000018f, -0.000001f, 0.000161f);
     
   
     
@@ -1513,17 +1620,16 @@ void init()
 	/**************************************/
 	/************** Motors ****************/
 	/**************************************/
-
-    //перевод микросекунд в тики
-    uint32_t us_scale = (uint32_t) (SystemCoreClock / 1000000);
+    
+    /*500Hz*/
     //TODO: поиграться (may be 700::1900 or 800:1800 e.t.c.)
-    minMotors =  900 * us_scale;
-    maxMotors = 1700 * us_scale;
+    minMotors =  900 * 30;
+    maxMotors = 1900 * 30;
     
     /************** Motors::Timer *****************/
     htim_motor.Instance = TIM3;
-    htim_motor.Init.Period = 2000 * us_scale;          //500Hz
-    htim_motor.Init.Prescaler = 0;                     //Max resolution
+    htim_motor.Init.Period = 2000 * 30;
+    htim_motor.Init.Prescaler = 6 - 1;
     htim_motor.Init.ClockDivision = 0; 
     htim_motor.Init.CounterMode = TIM_COUNTERMODE_UP;
 	
