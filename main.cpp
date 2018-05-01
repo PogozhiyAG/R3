@@ -196,8 +196,8 @@ float motors[4] = {0,0,0,0};
 
 //сенсоры
 L3G4200D        gyroscope       (&hi2c_2, 0.18f);
-LIS331DLH       accelerometer   (&hi2c_2, 0.02f);
-LIS3MDL         magnetometer    (&hi2c,   0.02f);
+LIS331DLH       accelerometer   (&hi2c_2, 0.018f);
+LIS3MDL         magnetometer    (&hi2c,   0.018f);
 I2CSensor3Axis  barometer       (&hi2c_2, 0xB9, 0x27);
 
 //фильтр ориентации
@@ -370,8 +370,8 @@ void taskInitAHRS()
         {
             if(get_time() - time >= 1000000)
             {
-                ahrs_Madgwick.beta = 0.02f;
-                ahrs_Madgwick.zeta = 0.003f;
+                ahrs_Madgwick.beta = 0.003f;
+                ahrs_Madgwick.zeta = 0.00015f;
                 
                 ahrs_state = 2;
             }
@@ -774,12 +774,12 @@ void taskControl()
                 temp_rc_axis_y = frsky_sbus.get_channel_axis_y(0.008f);
                 temp_rc_axis_z = frsky_sbus.get_channel_axis_z(0.008f);
                 
-                //temp_p         = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.40f, 1.00f); 
-                temp_beta      = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.003f, 0.05f); 
+                temp_p         = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.70f, 1.00f); 
+                //temp_beta      = mapf((frsky_sbus.channels[12] > 0 ? frsky_sbus.channels[12] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.003f, 0.05f); 
                 temp_i         = mapf((frsky_sbus.channels[14] > 0 ? frsky_sbus.channels[14] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 1.00f); 
                 temp_maxI      = mapf((frsky_sbus.channels[15] > 0 ? frsky_sbus.channels[15] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.00f, 0.04f); 
-                //temp_d         = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.10f, 0.30f); 
-                temp_zeta      = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.000f, 0.01f); 
+                temp_d         = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.17f, 0.30f); 
+                //temp_zeta      = mapf((frsky_sbus.channels[13] > 0 ? frsky_sbus.channels[13] : FRSKY_MIN_CHANNEL_VALUE) * 1.0f, FRSKY_MIN_CHANNEL_VALUE, FRSKY_MAX_CHANNEL_VALUE, 0.000f, 0.01f); 
                 
                 temp_set_home_presure = (frsky_sbus.channels[11] == 0x0713);
                 
@@ -810,15 +810,15 @@ void taskControl()
                 
                 if(ahrs_state >= 2)
                 {
-                    ahrs_Madgwick.beta = temp_beta;
-                    ahrs_Madgwick.zeta = temp_zeta;
+                    //ahrs_Madgwick.beta = temp_beta;
+                    //ahrs_Madgwick.zeta = temp_zeta;
                 }
                 
                 
-                //pidX.kP   = pidY.kP   = pidZ.kP   = temp_p;
+                pidX.kP   = pidY.kP   = pidZ.kP   = temp_p;
                 pidX.kI   = pidY.kI   = pidZ.kI   = temp_i;
                 pidX.maxI = pidY.maxI = pidZ.maxI = temp_maxI;            
-                //pidX.kD   = pidY.kD   = pidZ.kD   = temp_d;                
+                pidX.kD   = pidY.kD   = pidZ.kD   = temp_d;                
 
                 if (temp_set_home_presure)
                 {
@@ -835,8 +835,8 @@ void taskControl()
                 rc_axis_y = 0.0f;
                 rc_axis_z = 0.0f;           
                 
-                ahrs_Madgwick.beta = 0.02f;
-                ahrs_Madgwick.zeta = 0.003;
+                ahrs_Madgwick.beta = 0.003f;
+                ahrs_Madgwick.zeta = 0.00015;
                 
                 pidX.kP   = pidY.kP   = pidZ.kP   = kP;
                 pidX.kI   = pidY.kI   = pidZ.kI   = kI;
@@ -1058,10 +1058,10 @@ void init_sensors()
     magnetometer.writeRegister(LIS3MDL_CTRL_REG3, 0x00, 10);
     magnetometer.writeRegister(LIS3MDL_CTRL_REG4, 0x04, 10);
     magnetometer.writeRegister(LIS3MDL_CTRL_REG5, 0x40, 10);
-	magnetometer.offset.Set(-828.014683f, 1162.256930f, -3130.607663);	
-	magnetometer.scaleFactor[0].Set(0.000343f, -0.000021f, -0.000038f);
-	magnetometer.scaleFactor[1].Set(-0.000021f, 0.000334f, -0.000021f);
-	magnetometer.scaleFactor[2].Set(-0.000038f, -0.000021f, 0.000280f);
+	magnetometer.offset.Set(-909.744878f, 1187.661095f, -902.216462f);	
+	magnetometer.scaleFactor[0].Set(0.000416f, -0.000003f, -0.000018f);
+	magnetometer.scaleFactor[1].Set(-0.000003f, 0.000435f, -0.000001f);
+	magnetometer.scaleFactor[2].Set(-0.000018f, -0.000001f, 0.000161f);
     
   
     
